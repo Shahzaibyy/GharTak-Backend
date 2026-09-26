@@ -11,16 +11,24 @@ import (
 )
 
 type Config struct {
-	AppEnv        string
-	HTTPAddr      string
-	DatabaseURL   string
-	RedisURL      string
-	MigrationsDir string
-	DBMaxConns    int32
-	PIIKey        []byte
-	PhoneHashKey  []byte
-	JWTKey        []byte
-	FCMServerKey  string
+	AppEnv                  string
+	HTTPAddr                string
+	DatabaseURL             string
+	RedisURL                string
+	MigrationsDir           string
+	DBMaxConns              int32
+	PIIKey                  []byte
+	PhoneHashKey            []byte
+	JWTKey                  []byte
+	FCMServerKey            string
+	FirebaseProjectID       string
+	FirebaseCredentialsFile string
+	FirebaseCredentialsJSON string
+	S3Endpoint              string
+	S3Bucket                string
+	S3Region                string
+	S3AccessKey             string
+	S3SecretKey             string
 }
 
 func Load() (Config, error) {
@@ -49,16 +57,24 @@ func fromEnv() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		AppEnv:        env("APP_ENV", "development"),
-		HTTPAddr:      env("HTTP_ADDR", ":8080"),
-		DatabaseURL:   os.Getenv("DATABASE_URL"),
-		RedisURL:      env("REDIS_URL", "redis://localhost:6379/0"),
-		MigrationsDir: env("MIGRATIONS_DIR", "migrations"),
-		DBMaxConns:    maxConns,
-		PIIKey:        pii,
-		PhoneHashKey:  hash,
-		JWTKey:        jwtKey,
-		FCMServerKey:  os.Getenv("FCM_SERVER_KEY"),
+		AppEnv:                  env("APP_ENV", "development"),
+		HTTPAddr:                env("HTTP_ADDR", ":8080"),
+		DatabaseURL:             os.Getenv("DATABASE_URL"),
+		RedisURL:                env("REDIS_URL", "redis://localhost:6379/0"),
+		MigrationsDir:           env("MIGRATIONS_DIR", "migrations"),
+		DBMaxConns:              maxConns,
+		PIIKey:                  pii,
+		PhoneHashKey:            hash,
+		JWTKey:                  jwtKey,
+		FCMServerKey:            os.Getenv("FCM_SERVER_KEY"),
+		FirebaseProjectID:       os.Getenv("FIREBASE_PROJECT_ID"),
+		FirebaseCredentialsFile: os.Getenv("FIREBASE_CREDENTIALS_FILE"),
+		FirebaseCredentialsJSON: os.Getenv("FIREBASE_CREDENTIALS_JSON"),
+		S3Endpoint:              env("S3_ENDPOINT", "http://127.0.0.1:9000"),
+		S3Bucket:                env("S3_BUCKET", "ghartak"),
+		S3Region:                env("S3_REGION", "us-east-1"),
+		S3AccessKey:             os.Getenv("S3_ACCESS_KEY"),
+		S3SecretKey:             os.Getenv("S3_SECRET_KEY"),
 	}, nil
 }
 

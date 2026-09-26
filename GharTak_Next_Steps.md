@@ -1,6 +1,6 @@
 # GharTak Backend — MVP implementation sequence
 
-Start here after the foundation in this repo. Do one step per change set. Keep `go test ./...` green before moving on.
+Start here after the foundation in this repo. Do one step per change set. Keep `go test ./...` green before moving on. Auth and onboarding completion is Step 14 onward.
 
 The product docs stay the source of truth for behavior: `GharTak_PRD.md`, `GharTak_SRS.md`, `GharTak_Technical_Design.md`. `GharTak_Backend_Rules.md` is the engineering constraint. This file is the order of work so later steps extend the schema and types already here.
 
@@ -55,6 +55,12 @@ These are already encoded in the schema, Go constants, or both. A later step tha
 | Webhooks | One `payments` row per order. `gateway_ref` is unique. Retries no-op when that ref already exists. |
 | Live location | Mount the WebSocket on the root mux, outside the 15s HTTP timeout group in `cmd/api/main.go`. |
 | Rate limit IP | `RemoteAddr` with the port stripped. Turn on forwarded-header trust only behind a known proxy. |
+| Google sign-in | Customer role only. Firebase Authentication, verified with the Admin SDK `VerifyIDToken`. The client then holds GharTak access and refresh JWTs. Auth middleware still checks only those JWTs. |
+| Google and phone accounts | Never merged. A Google signup has a null phone until `POST /auth/phone/link`. A later phone-OTP verify still creates its own user row. |
+| Phone before checkout | `POST /orders` returns `409 {"error":{"code":"phone_required",...}}` when `phone_verified` is false. Quote stays available. |
+| Account deletion | Soft delete. `deleted_at` is set. Name becomes `Deleted`. Email, phone ciphertext, phone lookup, and `firebase_uid` are cleared so the format check and unique indexes stay valid. Wallet must be zero. Order rows stay. |
+| Uploads | `POST /uploads/presign` returns a 15 minute PUT URL, `object_key`, `content_type` (`image/jpeg`), and `max_bytes`. CNIC and selfie are 2 MB. Vehicle documents are 5 MB. Catalog and proof photos are 8 MB. |
+| Phone link body | `{phone}` then `{otp}`. The completion note's empty link body cannot name a number, so the phone is required on the first call and held in Redis until verify. |
 
 ### Ledger direction
 
@@ -199,11 +205,70 @@ Module: `internal/modules/admin`, plus a scheduled job.
 - Masking for in-app calls is an integration behind an interface. Real numbers stay off the payload to the other party.
 - Nightly Postgres dump to object storage.
 
+## Step 14 — Profile schema
+
+Migration `migrations/0007_auth_google_and_profile.up.sql` and its down file. Leave `0001` through `0006` unchanged.
+
+- `users.phone_ciphertext` and `users.phone_lookup` become nullable.
+- Add `email`, `firebase_uid`, `phone_verified`, and `deleted_at`.
+- Replace `users_phone_lookup_unique` with a partial unique index `WHERE phone_lookup IS NOT NULL`.
+- Add `users_firebase_uid_unique` on `firebase_uid` where it is not null.
+- Backfill `phone_verified = true` for every row that already has a phone lookup.
+- Customer OTP insert sets `phone_verified = true`. Google insert leaves it false.
+- `ON CONFLICT` targets must include the partial-index predicate.
+
+## Step 15 — Profile
+
+`GET /users/me` and `PATCH /users/me` on the customer role.
+
+- Response is `{id, name, email, phone, phone_verified, wallet_balance}`. Phone is null when the row has no ciphertext. Wallet is a decimal string.
+- Decrypt the phone only for this caller. Do not log it.
+- Patch accepts `{name}` once, 1 to 100 characters. The service trusts that.
+
+## Step 16 — Presigned uploads
+
+`internal/platform/uploads`. `POST /uploads/presign` for any authenticated role.
+
+- Body `{purpose}` is one of `cnic`, `selfie`, `vehicle_doc`, `catalog_photo`, `proof_of_delivery`. Dispatch with the purpose map, not an if-else chain.
+- Object key is `{prefix}/{account_id}/{uuid}`.
+- When `S3_ACCESS_KEY` and `S3_SECRET_KEY` are set, the URL is a path-style SigV4 PUT signed for `Content-Type: image/jpeg`. Otherwise development returns an unsigned URL on `S3_ENDPOINT`.
+- Rider, merchant, and proof screens send `object_key` on the owning request. Rider OTP still requires an existing rider row, so a first-time rider registers before a later document replace, or uploads after a token exists.
+
+## Step 17 — Google sign-in
+
+`POST /auth/google` with `{firebase_id_token}`.
+
+- Inject the Firebase verifier from `cmd/api`, next to the pool and Redis client. Empty credentials make the route return unavailable. Do not construct the client inside the handler.
+- Verify the token, look up `users` by `firebase_uid`, and create a customer row when none exists. Do not match email or phone.
+- Copy `name` and `email` from the token when they fit. Issue the same session shape as OTP verify, role `customer`.
+- Table-driven cases: new user, returning user, expired token, wrong audience.
+
+## Step 18 — Phone link and checkout gate
+
+- `POST /auth/phone/link` with `{phone}` stores a hashed OTP and the sealed phone in Redis for 5 minutes, under the current user. Same limiter as OTP request.
+- `POST /auth/phone/link/verify` with `{otp}` writes `phone_ciphertext`, `phone_lookup`, and `phone_verified = true` on that row. A lookup that already belongs to someone else is a conflict.
+- `POST /orders` calls `RequirePhone` before insert. An existing `client_request_id` still returns the original order. A missing phone returns `phone_required` and does not insert.
+
+## Step 19 — Logout and account deletion
+
+- `POST /auth/logout` with `{refresh_token}` deletes that refresh key immediately and returns 204. It does not wait for reuse detection. A missing token is still 204.
+- `DELETE /users/me` returns 204. Lock the user row, refuse a non-zero wallet, then scrub the identity columns and set `deleted_at`. Clearing `firebase_uid` lets a later Google sign-in create a new row.
+
+## Step 20 — Merchant approval
+
+Same shape as rider approve and reject. Only a `pending` merchant moves.
+
+- `POST /admin/merchants/{id}/approve`
+- `POST /admin/merchants/{id}/reject`
+
+The status write stays in `internal/modules/merchants`. Admin routes call it. Customer browse already hides unapproved merchants.
+
 ## Module map
 
 | Path | Owns |
 |---|---|
-| `internal/modules/auth` | OTP, JWT, refresh |
+| `internal/modules/auth` | OTP, Google sign-in, JWT, refresh, profile, phone link, logout, account deletion |
+| `internal/platform/uploads` | Presigned upload URLs |
 | `internal/modules/orders` | Status machine, pricing, order writes |
 | `internal/modules/merchants` | Merchant profile and catalog |
 | `internal/modules/dispatch` | Offers and Redis geo |

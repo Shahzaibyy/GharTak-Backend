@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/yourusername/ghartak-backend/internal/platform/apperror"
+	"github.com/yourusername/ghartak-backend/internal/platform/domain"
 	"github.com/yourusername/ghartak-backend/internal/platform/pii"
 )
 
@@ -20,6 +21,12 @@ type store interface {
 	Prices(ctx context.Context, merchantID uuid.UUID, ids []uuid.UUID) ([]Price, error)
 	EnsureDemo(ctx context.Context, row demoRow) (uuid.UUID, error)
 	CatalogCount(ctx context.Context, merchantID uuid.UUID) (int, error)
+	SetVerification(ctx context.Context, id uuid.UUID, status string) (Merchant, error)
+}
+
+var merchantDecisions = map[domain.VerificationStatus]struct{}{
+	domain.VerificationApproved: {},
+	domain.VerificationRejected: {},
 }
 
 type zoneChecker interface {
@@ -66,6 +73,20 @@ func (s *Service) UpdateItem(ctx context.Context, merchantID, itemID uuid.UUID, 
 
 func (s *Service) DeleteItem(ctx context.Context, merchantID, itemID uuid.UUID) error {
 	return s.store.DeleteItem(ctx, merchantID, itemID)
+}
+
+func (s *Service) SetVerification(ctx context.Context, id uuid.UUID, status domain.VerificationStatus) (Merchant, error) {
+	if err := allowedDecision(status); err != nil {
+		return Merchant{}, err
+	}
+	return s.store.SetVerification(ctx, id, string(status))
+}
+
+func allowedDecision(status domain.VerificationStatus) error {
+	if _, ok := merchantDecisions[status]; !ok {
+		return apperror.Invalid("verification status is invalid")
+	}
+	return nil
 }
 
 func (s *Service) ApprovedPin(ctx context.Context, merchantID, zoneID uuid.UUID) (Pin, error) {

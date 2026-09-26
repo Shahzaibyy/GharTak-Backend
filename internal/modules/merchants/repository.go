@@ -72,6 +72,12 @@ ON CONFLICT (phone_lookup) DO NOTHING`
 const merchantByLookupSQL = `
 SELECT id FROM merchants WHERE phone_lookup = $1`
 
+const setVerificationSQL = `
+UPDATE merchants
+SET verification_status = $2, updated_at = now()
+WHERE id = $1 AND verification_status = 'pending'
+RETURNING id, name, category, zone_id, lat, lng, address_text, photo_key, commission_rate::text, verification_status`
+
 const catalogCountSQL = `
 SELECT COUNT(*) FROM catalog_items WHERE merchant_id = $1`
 
@@ -197,6 +203,19 @@ func (r *Repository) CatalogCount(ctx context.Context, merchantID uuid.UUID) (in
 		return 0, fmt.Errorf("merchants: catalog count: %w", err)
 	}
 	return count, nil
+}
+
+func (r *Repository) SetVerification(ctx context.Context, id uuid.UUID, status string) (Merchant, error) {
+	ctx, cancel := database.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	merchant, err := scanMerchant(r.pool.QueryRow(ctx, setVerificationSQL, id, status))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Merchant{}, apperror.ErrNotFound
+	}
+	if err != nil {
+		return Merchant{}, fmt.Errorf("merchants: set verification: %w", err)
+	}
+	return merchant, nil
 }
 
 func (r *Repository) Prices(ctx context.Context, merchantID uuid.UUID, ids []uuid.UUID) ([]Price, error) {

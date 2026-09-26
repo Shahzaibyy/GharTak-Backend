@@ -121,6 +121,31 @@ func (s *RedisStore) SpentFamily(ctx context.Context, hash string) (string, erro
 	return familyID, nil
 }
 
+func (s *RedisStore) Revoke(ctx context.Context, hash string) error {
+	raw, err := s.client.Get(ctx, refreshKey(hash)).Bytes()
+	if errors.Is(err, redis.Nil) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("auth: revoke refresh: %w", err)
+	}
+	return s.dropRefresh(ctx, hash, raw)
+}
+
+func (s *RedisStore) dropRefresh(ctx context.Context, hash string, raw []byte) error {
+	record, err := decodeRefresh(raw)
+	if err != nil {
+		return err
+	}
+	pipe := s.client.TxPipeline()
+	pipe.Del(ctx, refreshKey(hash))
+	pipe.SRem(ctx, familyKey(record.FamilyID), hash)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return fmt.Errorf("auth: revoke refresh: %w", err)
+	}
+	return nil
+}
+
 func (s *RedisStore) RevokeFamily(ctx context.Context, familyID string) error {
 	hashes, err := s.client.SMembers(ctx, familyKey(familyID)).Result()
 	if err != nil {

@@ -46,6 +46,10 @@ type offerer interface {
 	Offer(ctx context.Context, orderID uuid.UUID) error
 }
 
+type phoneGate interface {
+	RequirePhone(ctx context.Context, customerID uuid.UUID) error
+}
+
 type Service struct {
 	zones    zoneSource
 	catalog  catalogSource
@@ -53,6 +57,7 @@ type Service struct {
 	otpKey   []byte
 	notifier statusNotifier
 	offers   offerer
+	phones   phoneGate
 }
 
 func NewService(zones zoneSource, catalog catalogSource, orders orderStore) *Service {
@@ -63,6 +68,11 @@ func (s *Service) WithFlow(otpKey []byte, notify statusNotifier, offers offerer)
 	s.otpKey = otpKey
 	s.notifier = notify
 	s.offers = offers
+	return s
+}
+
+func (s *Service) UsePhoneGate(gate phoneGate) *Service {
+	s.phones = gate
 	return s
 }
 
@@ -90,6 +100,9 @@ func (s *Service) Get(ctx context.Context, customerID, orderID uuid.UUID) (Order
 }
 
 func (s *Service) create(ctx context.Context, customerID uuid.UUID, in PlaceInput) (Order, bool, error) {
+	if err := s.gatePhone(ctx, customerID); err != nil {
+		return Order{}, false, err
+	}
 	row, err := s.build(ctx, customerID, in)
 	if err != nil {
 		return Order{}, false, err
@@ -99,6 +112,13 @@ func (s *Service) create(ctx context.Context, customerID uuid.UUID, in PlaceInpu
 		return Order{}, false, err
 	}
 	return s.placed(ctx, row)
+}
+
+func (s *Service) gatePhone(ctx context.Context, customerID uuid.UUID) error {
+	if s.phones == nil {
+		return nil
+	}
+	return s.phones.RequirePhone(ctx, customerID)
 }
 
 func (s *Service) placed(ctx context.Context, row draft) (Order, bool, error) {

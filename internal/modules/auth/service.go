@@ -43,11 +43,23 @@ type sessionStore interface {
 	MarkSpent(ctx context.Context, hash, familyID string, ttl time.Duration) error
 	SpentFamily(ctx context.Context, hash string) (string, error)
 	RevokeFamily(ctx context.Context, familyID string) error
+	Revoke(ctx context.Context, hash string) error
 }
 
 type accountStore interface {
 	UpsertCustomer(ctx context.Context, ciphertext, lookup string) (Account, error)
 	Find(ctx context.Context, role Role, lookup string) (Account, error)
+	FindByFirebase(ctx context.Context, uid string) (Account, error)
+	InsertGoogle(ctx context.Context, row googleInsert) (Account, error)
+	Profile(ctx context.Context, id uuid.UUID) (profileRow, error)
+	UpdateName(ctx context.Context, id uuid.UUID, name string) (profileRow, error)
+	AttachPhone(ctx context.Context, id uuid.UUID, ciphertext, lookup string) error
+	PhoneVerified(ctx context.Context, id uuid.UUID) (bool, error)
+	SoftDelete(ctx context.Context, id uuid.UUID) error
+}
+
+type tokenVerifier interface {
+	Verify(ctx context.Context, idToken string) (Identity, error)
 }
 
 type Service struct {
@@ -59,6 +71,7 @@ type Service struct {
 	hashKey  []byte
 	jwtKey   []byte
 	dev      bool
+	identity tokenVerifier
 	now      func() time.Time
 }
 
@@ -74,6 +87,10 @@ func NewService(accounts accountStore, codes codeStore, limits limiter, sessions
 		dev:      dev,
 		now:      time.Now,
 	}
+}
+
+func (s *Service) UseIdentity(verifier tokenVerifier) {
+	s.identity = verifier
 }
 
 func (s *Service) RequestOTP(ctx context.Context, req OTPRequest) (OTPResult, error) {

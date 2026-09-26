@@ -16,6 +16,7 @@ var (
 type Error struct {
 	sentinel error
 	message  string
+	code     string
 }
 
 func Invalid(message string) error {
@@ -34,8 +35,14 @@ func Conflict(message string) error {
 	return &Error{sentinel: ErrConflict, message: message}
 }
 
+func ConflictCode(code, message string) error {
+	return &Error{sentinel: ErrConflict, message: message, code: code}
+}
+
 func (e *Error) Error() string { return e.message }
 
 func (e *Error) Unwrap() error { return e.sentinel }
 
 func (e *Error) Message() string { return e.message }
+
+func (e *Error) Code() string { return e.code }

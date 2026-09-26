@@ -122,6 +122,32 @@ func (f *fakeAccounts) Find(context.Context, Role, string) (Account, error) {
 	return Account{}, apperror.ErrNotFound
 }
 
+func (f *fakeAccounts) FindByFirebase(context.Context, string) (Account, error) {
+	return Account{}, apperror.ErrNotFound
+}
+
+func (f *fakeAccounts) InsertGoogle(context.Context, googleInsert) (Account, error) {
+	return f.customer, nil
+}
+
+func (f *fakeAccounts) Profile(context.Context, uuid.UUID) (profileRow, error) {
+	return profileRow{}, apperror.ErrNotFound
+}
+
+func (f *fakeAccounts) UpdateName(context.Context, uuid.UUID, string) (profileRow, error) {
+	return profileRow{}, apperror.ErrNotFound
+}
+
+func (f *fakeAccounts) AttachPhone(context.Context, uuid.UUID, string, string) error {
+	return nil
+}
+
+func (f *fakeAccounts) PhoneVerified(context.Context, uuid.UUID) (bool, error) {
+	return false, apperror.ErrNotFound
+}
+
+func (f *fakeAccounts) SoftDelete(context.Context, uuid.UUID) error { return nil }
+
 type fakeSessions struct{}
 
 func (fakeSessions) SaveRefresh(context.Context, string, refreshRecord, time.Duration) error {
@@ -139,3 +165,5 @@ func (fakeSessions) SpentFamily(context.Context, string) (string, error) {
 }
 
 func (fakeSessions) RevokeFamily(context.Context, string) error { return nil }
+
+func (fakeSessions) Revoke(context.Context, string) error { return nil }

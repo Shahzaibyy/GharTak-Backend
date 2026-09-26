@@ -66,6 +66,10 @@ func WriteError(w http.ResponseWriter, err error) {
 	write(w, status, errorEnvelope{Error: apiError{Code: code, Message: message}})
 }
 
+func NoContent(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func WriteInternal(w http.ResponseWriter) {
 	write(w, http.StatusInternalServerError, errorEnvelope{
 		Error: apiError{Code: "internal", Message: "internal error"},
@@ -75,10 +79,18 @@ func WriteInternal(w http.ResponseWriter) {
 func classify(err error) (int, string, string) {
 	for _, item := range catalog {
 		if errors.Is(err, item.sentinel) {
-			return item.status, item.code, publicMessage(err, item.message)
+			return item.status, publicCode(err, item.code), publicMessage(err, item.message)
 		}
 	}
 	return http.StatusInternalServerError, "internal", "internal error"
+}
+
+func publicCode(err error, fallback string) string {
+	var pub *apperror.Error
+	if errors.As(err, &pub) && pub.Code() != "" {
+		return pub.Code()
+	}
+	return fallback
 }
 
 func publicMessage(err error, fallback string) string {

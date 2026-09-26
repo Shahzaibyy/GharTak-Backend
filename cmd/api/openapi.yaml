@@ -8,6 +8,7 @@ info:
 
     In development, `POST /auth/otp/request` returns `dev_otp`. Send that code to
     `POST /auth/otp/verify`, then paste `access_token` into the Authorize button as a Bearer token.
+    Customer Google sign-in is `POST /auth/google`. Profile is `GET /users/me`. Upload targets are `POST /uploads/presign`.
 
     Attock City zone id: `11111111-1111-4111-8111-111111111101`.
     Demo kitchen id: `22222222-2222-4222-8222-222222222201`.
@@ -132,6 +133,158 @@ paths:
               schema:
                 $ref: "#/components/schemas/SessionResponse"
         "401":
+          $ref: "#/components/responses/Error"
+  /auth/google:
+    post:
+      tags: [Auth]
+      summary: Sign in a customer with Firebase
+      description: Customer role only. Verifies a Firebase ID token from Google sign-in and returns GharTak access and refresh tokens. The Firebase token is not sent again.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoogleSignIn"
+      responses:
+        "200":
+          description: Session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke one refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "204":
+          description: Refresh token revoked
+        "400":
+          $ref: "#/components/responses/Error"
+  /auth/phone/link:
+    post:
+      tags: [Auth]
+      summary: Send an OTP to attach a phone
+      description: Authenticated customer. Same OTP TTL, hash, and rate limits as phone login. Writes onto the current user. It does not merge a separate phone account.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PhoneLink"
+      responses:
+        "200":
+          description: Code stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OTPResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+  /auth/phone/link/verify:
+    post:
+      tags: [Auth]
+      summary: Verify the phone attached to the current customer
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [otp]
+              properties:
+                otp: {type: string, minLength: 6, maxLength: 6}
+      responses:
+        "204":
+          description: Phone saved and verified
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /users/me:
+    get:
+      tags: [Auth]
+      summary: Current customer profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileResponse"
+    patch:
+      tags: [Auth]
+      summary: Update the customer name
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string, minLength: 1, maxLength: 100}
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Auth]
+      summary: Soft-delete the customer account
+      description: Requires a zero wallet balance. Scrubs name, email, phone, and Firebase uid. Order history stays.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Account deleted
+        "409":
+          $ref: "#/components/responses/Error"
+  /uploads/presign:
+    post:
+      tags: [Auth]
+      summary: Presign an object upload
+      description: Authenticated caller. PUT the file to upload_url with Content-Type image/jpeg. Send object_key back on the owning request. CNIC and selfie are limited to 2 MB. Vehicle documents are 5 MB. Catalog and proof photos are 8 MB. The URL expires in 15 minutes.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PresignRequest"
+      responses:
+        "200":
+          description: Upload target
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresignResponse"
+        "400":
           $ref: "#/components/responses/Error"
   /merchants/register:
     post:
@@ -420,7 +573,7 @@ paths:
     post:
       tags: [Orders]
       summary: Place an order
-      description: The same client_request_id returns the original order. Payment is stored as held.
+      description: The same client_request_id returns the original order. Payment is stored as held. A customer with phone_verified false gets 409 phone_required and no order is created.
       security:
         - bearerAuth: []
       requestBody:
@@ -660,6 +813,46 @@ paths:
               schema:
                 $ref: "#/components/schemas/RiderResponse"
         "409":
+          $ref: "#/components/responses/Error"
+  /admin/merchants/{id}/approve:
+    post:
+      tags: [Admin]
+      summary: Approve a pending merchant
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        "200":
+          description: Merchant approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MerchantResponse"
+        "404":
+          $ref: "#/components/responses/Error"
+  /admin/merchants/{id}/reject:
+    post:
+      tags: [Admin]
+      summary: Reject a pending merchant
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        "200":
+          description: Merchant rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MerchantResponse"
+        "404":
           $ref: "#/components/responses/Error"
   /orders/{id}/cancel:
     post:
@@ -1251,6 +1444,52 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/Session"
+    GoogleSignIn:
+      type: object
+      required: [firebase_id_token]
+      properties:
+        firebase_id_token:
+          type: string
+    PhoneLink:
+      type: object
+      required: [phone]
+      properties:
+        phone:
+          type: string
+          example: "03001234567"
+    Profile:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string, nullable: true}
+        email: {type: string, nullable: true}
+        phone: {type: string, nullable: true}
+        phone_verified: {type: boolean}
+        wallet_balance:
+          $ref: "#/components/schemas/Money"
+    ProfileResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Profile"
+    PresignRequest:
+      type: object
+      required: [purpose]
+      properties:
+        purpose:
+          type: string
+          enum: [cnic, selfie, vehicle_doc, catalog_photo, proof_of_delivery]
+    PresignResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            upload_url: {type: string}
+            object_key: {type: string}
+            expires_in: {type: integer, example: 900}
+            content_type: {type: string, example: image/jpeg}
+            max_bytes: {type: integer}
     MerchantRegister:
       type: object
       required: [phone, owner_name, name, category, zone_id, lat, lng, address_text]

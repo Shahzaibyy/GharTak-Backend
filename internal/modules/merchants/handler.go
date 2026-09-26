@@ -10,6 +10,7 @@ import (
 
 	"github.com/yourusername/ghartak-backend/internal/modules/auth"
 	"github.com/yourusername/ghartak-backend/internal/platform/apperror"
+	"github.com/yourusername/ghartak-backend/internal/platform/domain"
 	"github.com/yourusername/ghartak-backend/internal/platform/httpx"
 	"github.com/yourusername/ghartak-backend/internal/platform/money"
 )
@@ -21,6 +22,7 @@ type catalogAPI interface {
 	AddItem(ctx context.Context, merchantID uuid.UUID, in CatalogInput) (CatalogItem, error)
 	UpdateItem(ctx context.Context, merchantID, itemID uuid.UUID, in CatalogInput) (CatalogItem, error)
 	DeleteItem(ctx context.Context, merchantID, itemID uuid.UUID) error
+	SetVerification(ctx context.Context, id uuid.UUID, status domain.VerificationStatus) (Merchant, error)
 }
 
 type Handler struct {
@@ -269,4 +271,27 @@ func validLng(lng float64) error {
 		return apperror.Invalid("location is invalid")
 	}
 	return nil
+}
+
+func (h *Handler) Approve(w http.ResponseWriter, r *http.Request) {
+	h.decideMerchant(w, r, domain.VerificationApproved)
+}
+
+func (h *Handler) Reject(w http.ResponseWriter, r *http.Request) {
+	h.decideMerchant(w, r, domain.VerificationRejected)
+}
+
+func (h *Handler) decideMerchant(w http.ResponseWriter, r *http.Request, status domain.VerificationStatus) {
+	id, err := httpx.ParseUUID(chi.URLParam(r, "id"), "id")
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	merchant, err := h.merchants.SetVerification(r.Context(), id, status)
+	if err != nil {
+		h.log.Error().Err(err).Str("merchant_id", id.String()).Msg("merchant verification")
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteData(w, http.StatusOK, merchant)
 }

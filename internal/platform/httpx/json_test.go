@@ -22,6 +22,7 @@ func TestWriteError(t *testing.T) {
 		{name: "invalid", err: apperror.Invalid("active must be true or false"), status: 400, code: "invalid_input", message: "active must be true or false"},
 		{name: "not found", err: apperror.ErrNotFound, status: 404, code: "not_found", message: "resource not found"},
 		{name: "conflict", err: apperror.ErrConflict, status: 409, code: "conflict", message: "conflict"},
+		{name: "phone required", err: apperror.ConflictCode("phone_required", "verify a phone number before placing an order"), status: 409, code: "phone_required", message: "verify a phone number before placing an order"},
 		{name: "rate", err: apperror.ErrRateLimited, status: 429, code: "rate_limited", message: "too many requests"},
 		{name: "wrapped", err: errors.Join(errors.New("db"), apperror.ErrUnavailable), status: 503, code: "unavailable", message: "service unavailable"},
 		{name: "unknown", err: errors.New("sql failed"), status: 500, code: "internal", message: "internal error"},

@@ -23,6 +23,7 @@ import (
 	"github.com/yourusername/ghartak-backend/internal/modules/riders"
 	"github.com/yourusername/ghartak-backend/internal/modules/support"
 	"github.com/yourusername/ghartak-backend/internal/platform/httpserver"
+	"github.com/yourusername/ghartak-backend/internal/platform/uploads"
 )
 
 type modules struct {
@@ -40,6 +41,7 @@ type modules struct {
 	chat      *chat.Handler
 	notify    *notifications.Handler
 	realtime  *realtime.Handler
+	uploads   *uploads.Handler
 }
 
 func (a *application) handler() (http.Handler, error) {
@@ -59,13 +61,18 @@ func buildModules(app *application) (modules, error) {
 	}
 	store := auth.NewRedisStore(app.redis)
 	authSvc := auth.NewService(auth.NewRepository(app.pool), store, store, store, app.cfg.PIIKey, app.cfg.PhoneHashKey, app.cfg.JWTKey, app.cfg.AppEnv == "development")
+	identity, err := auth.OpenIdentity(context.Background(), app.cfg.FirebaseProjectID, app.cfg.FirebaseCredentialsFile, app.cfg.FirebaseCredentialsJSON)
+	if err != nil {
+		return modules{}, err
+	}
+	authSvc.UseIdentity(identity)
 	payRepo := payments.NewRepository(app.pool)
 	noteRepo := notifications.NewRepository(app.pool)
 	sender := notifications.NewSender(app.log, app.cfg.FCMServerKey, noteRepo)
 	geo := dispatch.NewGeo(app.redis)
 	dispSvc := dispatch.NewService(dispatch.NewRepository(app.pool), geo)
 	orderRepo := orders.NewRepository(app.pool).WithBooks(payRepo)
-	orderSvc := orders.NewService(adminSvc, merchantSvc, orderRepo).WithFlow(app.cfg.PhoneHashKey, sender, dispSvc)
+	orderSvc := orders.NewService(adminSvc, merchantSvc, orderRepo).WithFlow(app.cfg.PhoneHashKey, sender, dispSvc).UsePhoneGate(authSvc)
 	riderSvc := riders.NewService(riders.NewRepository(app.pool), adminSvc, app.cfg.PIIKey, app.cfg.PhoneHashKey)
 	riderSvc.UsePresence(geo)
 	chatSvc := chat.NewService(chat.NewRepository(app.pool), orderSvc, app.redis, app.log)
@@ -83,6 +90,10 @@ func buildModules(app *application) (modules, error) {
 		chat:      chat.NewHandler(chatSvc, app.log),
 		notify:    notifications.NewHandler(sender, app.log),
 		realtime:  realtime.NewHandler(app.cfg.JWTKey, app.redis, orderSvc, chatSvc, app.log),
+		uploads: uploads.NewHandler(uploads.NewSigner(uploads.Settings{
+			Endpoint: app.cfg.S3Endpoint, Bucket: app.cfg.S3Bucket, Region: app.cfg.S3Region,
+			AccessKey: app.cfg.S3AccessKey, SecretKey: app.cfg.S3SecretKey,
+		}), auth.AccountID, app.log),
 	}, nil
 }
 
@@ -121,6 +132,8 @@ func publicRoutes(r chi.Router, m modules) {
 	r.Post("/auth/otp/request", m.auth.RequestOTP)
 	r.Post("/auth/otp/verify", m.auth.Verify)
 	r.Post("/auth/refresh", m.auth.Refresh)
+	r.Post("/auth/google", m.auth.Google)
+	r.Post("/auth/logout", m.auth.Logout)
 	r.Post("/merchants/register", m.merchants.Register)
 	r.Get("/merchants", m.merchants.List)
 	r.Get("/merchants/{id}/catalog", m.merchants.Catalog)
@@ -142,6 +155,11 @@ func privateRoutes(r chi.Router, m modules) {
 func customerRoutes(r chi.Router, m modules) {
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RequireRole(auth.RoleCustomer))
+		r.Get("/users/me", m.auth.Me)
+		r.Patch("/users/me", m.auth.UpdateMe)
+		r.Delete("/users/me", m.auth.DeleteMe)
+		r.Post("/auth/phone/link", m.auth.PhoneLink)
+		r.Post("/auth/phone/link/verify", m.auth.PhoneLinkVerify)
 		r.Get("/addresses", m.customers.List)
 		r.Post("/addresses", m.customers.Create)
 		r.Patch("/addresses/{id}", m.customers.Update)
@@ -159,6 +177,7 @@ func customerRoutes(r chi.Router, m modules) {
 }
 
 func sharedRoutes(r chi.Router, m modules) {
+	r.Post("/uploads/presign", m.uploads.Presign)
 	r.Post("/notifications/devices", m.notify.Register)
 	r.Get("/orders/{id}/messages", m.chat.List)
 	r.Post("/orders/{id}/messages", m.chat.Send)
@@ -189,6 +208,8 @@ func adminRoutes(r chi.Router, m modules) {
 		r.Post("/admin/riders/{id}/approve", m.riders.Approve)
 		r.Post("/admin/riders/{id}/reject", m.riders.Reject)
 		r.Post("/admin/riders/{id}/suspend", m.riders.Suspend)
+		r.Post("/admin/merchants/{id}/approve", m.merchants.Approve)
+		r.Post("/admin/merchants/{id}/reject", m.merchants.Reject)
 		r.Post("/admin/riders/{id}/settle", m.payments.SettleCash)
 		r.Post("/admin/wallet/credits", m.payments.CreditWallet)
 	})

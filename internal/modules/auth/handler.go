@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
 	"github.com/yourusername/ghartak-backend/internal/platform/apperror"
@@ -15,6 +16,13 @@ type authenticator interface {
 	RequestOTP(ctx context.Context, req OTPRequest) (OTPResult, error)
 	Verify(ctx context.Context, req VerifyRequest) (Session, error)
 	Refresh(ctx context.Context, refreshToken string) (Session, error)
+	GoogleSignIn(ctx context.Context, idToken string) (Session, error)
+	Logout(ctx context.Context, refreshToken string) error
+	Profile(ctx context.Context, id uuid.UUID) (Profile, error)
+	UpdateName(ctx context.Context, id uuid.UUID, name string) (Profile, error)
+	DeleteMe(ctx context.Context, id uuid.UUID) error
+	PhoneLink(ctx context.Context, id uuid.UUID, phone, ip string) (OTPResult, error)
+	PhoneLinkVerify(ctx context.Context, id uuid.UUID, otp string) error
 }
 
 type Handler struct {
