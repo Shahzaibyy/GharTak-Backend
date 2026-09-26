@@ -69,6 +69,7 @@ func routes(m modules) http.Handler {
 	router.Group(func(r chi.Router) {
 		r.Use(middleware.Timeout(15 * time.Second))
 		r.Use(limiter.Middleware)
+		mountDocs(r)
 		publicRoutes(r, m)
 		privateRoutes(r, m)
 	})

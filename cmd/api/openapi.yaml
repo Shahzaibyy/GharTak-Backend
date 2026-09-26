@@ -1,0 +1,973 @@
+openapi: "3.0.3"
+info:
+  title: GharTak API
+  version: "0.1.0"
+  description: |
+    Local API for the GharTak backend. Success responses use `{"data":...}`.
+    Errors use `{"error":{"code","message"}}`.
+
+    In development, `POST /auth/otp/request` returns `dev_otp`. Send that code to
+    `POST /auth/otp/verify`, then paste `access_token` into the Authorize button as a Bearer token.
+
+    Attock City zone id: `11111111-1111-4111-8111-111111111101`.
+    Demo kitchen id: `22222222-2222-4222-8222-222222222201`.
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: Health
+  - name: Zones
+  - name: Auth
+  - name: Merchants
+  - name: Addresses
+  - name: Orders
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Process and database health
+      responses:
+        "200":
+          description: Database ping succeeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          $ref: "#/components/responses/Error"
+  /zones:
+    get:
+      tags: [Zones]
+      summary: List zones
+      parameters:
+        - name: active
+          in: query
+          schema:
+            type: boolean
+          description: When true, only launch cities are returned.
+      responses:
+        "200":
+          description: Zone list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZoneListResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+  /auth/otp/request:
+    post:
+      tags: [Auth]
+      summary: Send a one-time code
+      description: Five requests per hour for the phone and twenty per hour for the IP. Development responses include dev_otp.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OTPRequest"
+            example:
+              phone: "03001234567"
+              role: customer
+      responses:
+        "200":
+          description: Code stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OTPResponse"
+              example:
+                data:
+                  dev_otp: "123456"
+        "400":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+  /auth/otp/verify:
+    post:
+      tags: [Auth]
+      summary: Exchange a code for tokens
+      description: The first customer verify creates the user. Rider, merchant, and admin accounts must already exist.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OTPVerify"
+            example:
+              phone: "03001234567"
+              role: customer
+              otp: "123456"
+      responses:
+        "200":
+          description: Session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate a refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: New session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+  /merchants/register:
+    post:
+      tags: [Merchants]
+      summary: Register a merchant
+      description: Verification stays pending. Commission is set from the category.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MerchantRegister"
+            example:
+              phone: "03007654321"
+              owner_name: Ali Khan
+              name: Attock Biryani
+              category: restaurant
+              zone_id: "11111111-1111-4111-8111-111111111101"
+              lat: 33.773
+              lng: 72.360
+              address_text: Main bazaar, Attock City
+      responses:
+        "201":
+          description: Merchant created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MerchantResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /merchants:
+    get:
+      tags: [Merchants]
+      summary: Approved merchants in a zone
+      parameters:
+        - $ref: "#/components/parameters/ZoneID"
+      responses:
+        "200":
+          description: Merchant list, at most 20
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MerchantListResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+  /merchants/{id}/catalog:
+    get:
+      tags: [Merchants]
+      summary: Available catalog items
+      parameters:
+        - $ref: "#/components/parameters/MerchantID"
+      responses:
+        "200":
+          description: Available items, at most 50
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogListResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Merchants]
+      summary: Add a catalog item
+      security:
+        - bearerAuth: []
+      description: The bearer account id must equal the merchant id in the path.
+      parameters:
+        - $ref: "#/components/parameters/MerchantID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CatalogWrite"
+            example:
+              name: Chicken Biryani
+              description: Half portion
+              price: "450.00"
+              is_available: true
+              photo_key: catalog/biryani.jpg
+      responses:
+        "201":
+          description: Item created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogItemResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /merchants/{id}/catalog/{item_id}:
+    patch:
+      tags: [Merchants]
+      summary: Replace a catalog item
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/MerchantID"
+        - $ref: "#/components/parameters/ItemID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CatalogWrite"
+      responses:
+        "200":
+          description: Item updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogItemResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Merchants]
+      summary: Delete a catalog item
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/MerchantID"
+        - $ref: "#/components/parameters/ItemID"
+      responses:
+        "200":
+          description: Item deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletedResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /addresses:
+    get:
+      tags: [Addresses]
+      summary: List the caller's addresses
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: At most 20 addresses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddressListResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Addresses]
+      summary: Save an address
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddressWrite"
+            example:
+              label: Home
+              lat: 33.77
+              lng: 72.36
+              address_text: House 1, Attock City
+      responses:
+        "201":
+          description: Address created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddressResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+  /addresses/{id}:
+    patch:
+      tags: [Addresses]
+      summary: Update one of the caller's addresses
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/AddressID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddressWrite"
+      responses:
+        "200":
+          description: Address updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddressResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Addresses]
+      summary: Delete one of the caller's addresses
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/AddressID"
+      responses:
+        "200":
+          description: Address deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletedResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /orders/quote:
+    post:
+      tags: [Orders]
+      summary: Price an order without saving it
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteRequest"
+            examples:
+              errand:
+                summary: Errand
+                value:
+                  type: errand
+                  zone_id: "11111111-1111-4111-8111-111111111101"
+                  pickup_lat: 33.773
+                  pickup_lng: 72.360
+                  pickup_address: Demo kitchen, Attock City
+                  drop_lat: 33.780
+                  drop_lng: 72.370
+                  drop_address: House 1, Attock City
+                  description: Pick up a parcel
+                  effort_tier: medium
+                  payment_method: cod
+              food:
+                summary: Food
+                value:
+                  type: food
+                  zone_id: "11111111-1111-4111-8111-111111111101"
+                  merchant_id: "22222222-2222-4222-8222-222222222201"
+                  drop_lat: 33.780
+                  drop_lng: 72.370
+                  drop_address: House 1, Attock City
+                  items:
+                    - catalog_item_id: "00000000-0000-4000-8000-000000000001"
+                      quantity: 2
+                  payment_method: cod
+      responses:
+        "200":
+          description: Price quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+  /orders:
+    post:
+      tags: [Orders]
+      summary: Place an order
+      description: The same client_request_id returns the original order. Payment is stored as held.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaceOrder"
+            examples:
+              errand:
+                summary: Errand
+                value:
+                  type: errand
+                  zone_id: "11111111-1111-4111-8111-111111111101"
+                  pickup_lat: 33.773
+                  pickup_lng: 72.360
+                  pickup_address: Demo kitchen, Attock City
+                  drop_lat: 33.780
+                  drop_lng: 72.370
+                  drop_address: House 1, Attock City
+                  description: Pick up a parcel
+                  effort_tier: medium
+                  payment_method: cod
+                  client_request_id: req-errand-0001
+              food:
+                summary: Food
+                value:
+                  type: food
+                  zone_id: "11111111-1111-4111-8111-111111111101"
+                  merchant_id: "22222222-2222-4222-8222-222222222201"
+                  drop_lat: 33.780
+                  drop_lng: 72.370
+                  drop_address: House 1, Attock City
+                  items:
+                    - catalog_item_id: "00000000-0000-4000-8000-000000000001"
+                      quantity: 1
+                  payment_method: cod
+                  client_request_id: req-food-0001
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+        "200":
+          description: Existing order for this client_request_id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+  /orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Get one of the caller's orders
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderID"
+      responses:
+        "200":
+          description: Order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Paste the access_token from POST /auth/otp/verify.
+  parameters:
+    ZoneID:
+      name: zone_id
+      in: query
+      required: true
+      schema:
+        type: string
+        format: uuid
+      example: "11111111-1111-4111-8111-111111111101"
+    MerchantID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      example: "22222222-2222-4222-8222-222222222201"
+    ItemID:
+      name: item_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AddressID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    OrderID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Error:
+      description: Request failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+  schemas:
+    ErrorEnvelope:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+    Money:
+      type: string
+      description: PKR decimal string, such as "60.00".
+      example: "60.00"
+    Role:
+      type: string
+      enum: [customer, rider, merchant, admin]
+    HealthResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            status:
+              type: string
+              example: ok
+    Zone:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        city_name:
+          type: string
+        slug:
+          type: string
+        base_delivery_fee:
+          $ref: "#/components/schemas/Money"
+        per_km_rate:
+          $ref: "#/components/schemas/Money"
+        surge_multiplier:
+          type: string
+        service_radius_km:
+          type: string
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ZoneListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Zone"
+    OTPRequest:
+      type: object
+      required: [phone, role]
+      properties:
+        phone:
+          type: string
+          example: "03001234567"
+        role:
+          $ref: "#/components/schemas/Role"
+    OTPResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            dev_otp:
+              type: string
+              description: Present only when APP_ENV is development.
+    OTPVerify:
+      type: object
+      required: [phone, role, otp]
+      properties:
+        phone:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+        otp:
+          type: string
+          minLength: 6
+          maxLength: 6
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+    Session:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        expires_in:
+          type: integer
+          example: 3600
+        account_id:
+          type: string
+          format: uuid
+        role:
+          $ref: "#/components/schemas/Role"
+        status:
+          type: string
+    SessionResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Session"
+    MerchantRegister:
+      type: object
+      required: [phone, owner_name, name, category, zone_id, lat, lng, address_text]
+      properties:
+        phone:
+          type: string
+        owner_name:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+          enum: [restaurant, mart, pharmacy]
+        zone_id:
+          type: string
+          format: uuid
+        lat:
+          type: number
+        lng:
+          type: number
+        address_text:
+          type: string
+    Merchant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        category:
+          type: string
+        zone_id:
+          type: string
+          format: uuid
+        lat:
+          type: number
+        lng:
+          type: number
+        address_text:
+          type: string
+        photo_key:
+          type: string
+          nullable: true
+        commission_rate:
+          type: string
+        verification_status:
+          type: string
+    MerchantResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Merchant"
+    MerchantListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Merchant"
+    CatalogWrite:
+      type: object
+      required: [name, price, is_available]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          $ref: "#/components/schemas/Money"
+        is_available:
+          type: boolean
+        photo_key:
+          type: string
+    CatalogItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        merchant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        price:
+          $ref: "#/components/schemas/Money"
+        is_available:
+          type: boolean
+        photo_key:
+          type: string
+          nullable: true
+    CatalogItemResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/CatalogItem"
+    CatalogListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogItem"
+    AddressWrite:
+      type: object
+      required: [label, lat, lng, address_text]
+      properties:
+        label:
+          type: string
+        lat:
+          type: number
+        lng:
+          type: number
+        address_text:
+          type: string
+    Address:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        lat:
+          type: number
+        lng:
+          type: number
+        address_text:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    AddressResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Address"
+    AddressListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Address"
+    DeletedResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            deleted:
+              type: boolean
+    OrderItemInput:
+      type: object
+      required: [catalog_item_id, quantity]
+      properties:
+        catalog_item_id:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 20
+    QuoteRequest:
+      type: object
+      required: [type, zone_id, drop_lat, drop_lng, drop_address, payment_method]
+      properties:
+        type:
+          type: string
+          enum: [food, mart, courier, errand]
+        zone_id:
+          type: string
+          format: uuid
+        merchant_id:
+          type: string
+          format: uuid
+          description: Required for food and mart.
+        pickup_lat:
+          type: number
+        pickup_lng:
+          type: number
+        pickup_address:
+          type: string
+        drop_lat:
+          type: number
+        drop_lng:
+          type: number
+        drop_address:
+          type: string
+        description:
+          type: string
+          description: Required for courier and errand.
+        effort_tier:
+          type: string
+          enum: [low, medium, high]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItemInput"
+        payment_method:
+          type: string
+          enum: [jazzcash, easypaisa, cod, wallet]
+    PlaceOrder:
+      allOf:
+        - $ref: "#/components/schemas/QuoteRequest"
+        - type: object
+          required: [client_request_id]
+          properties:
+            client_request_id:
+              type: string
+              minLength: 8
+              maxLength: 64
+    Quote:
+      type: object
+      properties:
+        distance_km:
+          type: string
+        item_total:
+          $ref: "#/components/schemas/Money"
+        delivery_fee:
+          $ref: "#/components/schemas/Money"
+        commission_amount:
+          $ref: "#/components/schemas/Money"
+        rider_earning:
+          $ref: "#/components/schemas/Money"
+        surge_multiplier:
+          type: string
+        total:
+          $ref: "#/components/schemas/Money"
+    QuoteResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Quote"
+    OrderItem:
+      type: object
+      properties:
+        catalog_item_id:
+          type: string
+          format: uuid
+          nullable: true
+        item_name:
+          type: string
+        quantity:
+          type: integer
+        price_at_order:
+          $ref: "#/components/schemas/Money"
+    Order:
+      allOf:
+        - $ref: "#/components/schemas/Quote"
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            type:
+              type: string
+            customer_id:
+              type: string
+              format: uuid
+            merchant_id:
+              type: string
+              format: uuid
+              nullable: true
+            zone_id:
+              type: string
+              format: uuid
+            status:
+              type: string
+            pickup_lat:
+              type: number
+            pickup_lng:
+              type: number
+            drop_lat:
+              type: number
+            drop_lng:
+              type: number
+            pickup_address:
+              type: string
+            drop_address:
+              type: string
+            description:
+              type: string
+              nullable: true
+            effort_tier:
+              type: string
+              nullable: true
+            payment_method:
+              type: string
+            client_request_id:
+              type: string
+            created_at:
+              type: string
+              format: date-time
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/OrderItem"
+    OrderResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Order"
