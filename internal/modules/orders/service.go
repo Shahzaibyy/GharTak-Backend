@@ -8,6 +8,7 @@ import (
 
 	"github.com/yourusername/ghartak-backend/internal/modules/admin"
 	"github.com/yourusername/ghartak-backend/internal/modules/merchants"
+	"github.com/yourusername/ghartak-backend/internal/modules/notifications"
 	"github.com/yourusername/ghartak-backend/internal/platform/apperror"
 	"github.com/yourusername/ghartak-backend/internal/platform/money"
 )
@@ -25,16 +26,44 @@ type orderStore interface {
 	FindByClientRequest(ctx context.Context, customerID uuid.UUID, requestID string) (Order, error)
 	Insert(ctx context.Context, row draft) (Order, bool, error)
 	Get(ctx context.Context, customerID, orderID uuid.UUID) (Order, error)
+	GetByID(ctx context.Context, orderID uuid.UUID) (Order, error)
+	Party(ctx context.Context, orderID uuid.UUID) (Party, error)
+	ListByMerchant(ctx context.Context, merchantID uuid.UUID, status Status) ([]Order, error)
+	ListOffers(ctx context.Context, riderID uuid.UUID) ([]Order, error)
+	ListTasks(ctx context.Context, riderID uuid.UUID) ([]Order, error)
+	Advance(ctx context.Context, in advance) (Order, error)
+	AcceptOffer(ctx context.Context, riderID, orderID uuid.UUID) (Order, error)
+	RejectOffer(ctx context.Context, riderID, orderID uuid.UUID) (Order, error)
+	Deliver(ctx context.Context, in deliverInput) (Order, error)
+	Cancel(ctx context.Context, customerID, orderID uuid.UUID, reason string) (Order, error)
+}
+
+type statusNotifier interface {
+	OrderStatus(ctx context.Context, notice notifications.Notice)
+}
+
+type offerer interface {
+	Offer(ctx context.Context, orderID uuid.UUID) error
 }
 
 type Service struct {
-	zones   zoneSource
-	catalog catalogSource
-	orders  orderStore
+	zones    zoneSource
+	catalog  catalogSource
+	orders   orderStore
+	otpKey   []byte
+	notifier statusNotifier
+	offers   offerer
 }
 
 func NewService(zones zoneSource, catalog catalogSource, orders orderStore) *Service {
 	return &Service{zones: zones, catalog: catalog, orders: orders}
+}
+
+func (s *Service) WithFlow(otpKey []byte, notify statusNotifier, offers offerer) *Service {
+	s.otpKey = otpKey
+	s.notifier = notify
+	s.offers = offers
+	return s
 }
 
 func (s *Service) Quote(ctx context.Context, in PlaceInput) (Priced, error) {
@@ -65,7 +94,62 @@ func (s *Service) create(ctx context.Context, customerID uuid.UUID, in PlaceInpu
 	if err != nil {
 		return Order{}, false, err
 	}
-	return s.orders.Insert(ctx, row)
+	row, err = s.sealDelivery(row)
+	if err != nil {
+		return Order{}, false, err
+	}
+	return s.placed(ctx, row)
+}
+
+func (s *Service) placed(ctx context.Context, row draft) (Order, bool, error) {
+	order, created, err := s.orders.Insert(ctx, row)
+	if err != nil {
+		return Order{}, false, err
+	}
+	if !created {
+		return order, false, nil
+	}
+	order.DeliveryOTP = row.DeliveryOTP
+	return s.finishPlace(ctx, order)
+}
+
+func (s *Service) finishPlace(ctx context.Context, order Order) (Order, bool, error) {
+	s.notify(ctx, order)
+	if RequiresMerchant(order.Type) {
+		return order, true, nil
+	}
+	fresh, err := s.reload(ctx, order)
+	return fresh, true, err
+}
+
+func (s *Service) sealDelivery(row draft) (draft, error) {
+	if !RequiresMerchant(row.Input.Type) || len(s.otpKey) == 0 {
+		return row, nil
+	}
+	otp, hash, err := deliveryCode(s.otpKey)
+	if err != nil {
+		return draft{}, err
+	}
+	row.DeliveryOTP = otp
+	row.DeliveryHash = hash
+	return row, nil
+}
+
+func (s *Service) notify(ctx context.Context, order Order) {
+	if s.notifier == nil {
+		return
+	}
+	s.notifier.OrderStatus(ctx, notifications.Notice{
+		OrderID: order.ID, Status: string(order.Status), CustomerID: order.CustomerID,
+		MerchantID: order.MerchantID, RiderID: order.RiderID,
+	})
+}
+
+func (s *Service) offer(ctx context.Context, orderID uuid.UUID) error {
+	if s.offers == nil {
+		return nil
+	}
+	return s.offers.Offer(ctx, orderID)
 }
 
 func (s *Service) build(ctx context.Context, customerID uuid.UUID, in PlaceInput) (draft, error) {

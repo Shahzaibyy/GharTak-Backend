@@ -17,11 +17,12 @@ func TestDocsRedirectsToSwagger(t *testing.T) {
 		t.Fatalf("location = %s", loc)
 	}
 	page := requestDocs(t, handler, "/docs/")
-	if page.Code != http.StatusOK {
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "swagger") {
 		t.Fatalf("page status = %d body = %s", page.Code, page.Body.String())
 	}
-	if !strings.Contains(page.Body.String(), "swagger") {
-		t.Fatal("docs page is empty")
+	spec := requestDocs(t, handler, "/docs/swagger_spec")
+	if spec.Code != http.StatusOK || !strings.Contains(spec.Body.String(), "GharTak API") {
+		t.Fatalf("spec status = %d", spec.Code)
 	}
 }
 

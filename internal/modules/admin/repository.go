@@ -32,6 +32,11 @@ WHERE ($1::boolean = false OR is_active = true)
 ORDER BY city_name
 LIMIT 20`
 
+const ensureAdminSQL = `
+INSERT INTO admins (phone_ciphertext, phone_lookup, name, status)
+VALUES ($1, $2, $3, 'active')
+ON CONFLICT (phone_lookup) DO NOTHING`
+
 const getZoneSQL = `
 SELECT
     id,
@@ -64,6 +69,15 @@ func (r *Repository) List(ctx context.Context, activeOnly bool) ([]Zone, error) 
 	}
 	defer rows.Close()
 	return scanZones(rows)
+}
+
+func (r *Repository) EnsureAdmin(ctx context.Context, ciphertext, lookup, name string) error {
+	ctx, cancel := database.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	if _, err := r.pool.Exec(ctx, ensureAdminSQL, ciphertext, lookup, name); err != nil {
+		return fmt.Errorf("admin: seed admin: %w", err)
+	}
+	return nil
 }
 
 func (r *Repository) Get(ctx context.Context, id uuid.UUID) (Zone, error) {

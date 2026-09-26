@@ -20,6 +20,13 @@ tags:
   - name: Merchants
   - name: Addresses
   - name: Orders
+  - name: Riders
+  - name: Admin
+  - name: Payments
+  - name: Dispatch
+  - name: Chat
+  - name: Support
+  - name: Notifications
 paths:
   /health:
     get:
@@ -488,6 +495,585 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /riders/register:
+    post:
+      tags: [Riders]
+      summary: Apply to ride for GharTak
+      description: Creates a pending rider. The account stays offline until an admin approves it. Document fields are object storage keys, not file uploads.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RiderRegister"
+            example:
+              phone: "03001110001"
+              name: Ali Raza
+              cnic: "12345-1234567-1"
+              cnic_object_key: kyc/cnic.jpg
+              selfie_object_key: kyc/selfie.jpg
+              license_object_key: kyc/license.jpg
+              vehicle_reg: ATK-1234
+              zone_id: "11111111-1111-4111-8111-111111111101"
+      responses:
+        "201":
+          description: Rider application stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiderResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /riders/me:
+    get:
+      tags: [Riders]
+      summary: Signed-in rider profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Rider profile. Phone and CNIC numbers are omitted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiderResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /riders/availability:
+    post:
+      tags: [Riders]
+      summary: Go online or offline
+      description: Going online succeeds only when the rider is approved and assigned to a zone.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Availability"
+            example:
+              is_online: true
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiderResponse"
+        "403":
+          $ref: "#/components/responses/Error"
+  /admin/riders:
+    get:
+      tags: [Admin]
+      summary: Rider verification queue
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected, suspended]
+            default: pending
+      responses:
+        "200":
+          description: At most 20 riders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiderListResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /admin/riders/{id}/approve:
+    post:
+      tags: [Admin]
+      summary: Approve a pending rider
+      description: Sets verification to approved and assigns the launch-city zone in one update. Development admin phone is 03000000002.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RiderID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [zone_id]
+              properties:
+                zone_id:
+                  type: string
+                  format: uuid
+            example:
+              zone_id: "11111111-1111-4111-8111-111111111101"
+      responses:
+        "200":
+          description: Rider approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiderResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /admin/riders/{id}/reject:
+    post:
+      tags: [Admin]
+      summary: Reject a pending rider
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RiderID"
+      responses:
+        "200":
+          description: Rider rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiderResponse"
+        "409":
+          $ref: "#/components/responses/Error"
+  /admin/riders/{id}/suspend:
+    post:
+      tags: [Admin]
+      summary: Suspend an approved rider
+      description: Turns the rider offline. A suspended rider cannot sign in.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RiderID"
+      responses:
+        "200":
+          description: Rider suspended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiderResponse"
+        "409":
+          $ref: "#/components/responses/Error"
+  /orders/{id}/cancel:
+    post:
+      tags: [Orders]
+      summary: Cancel an order before delivery
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, maxLength: 200}
+      responses:
+        "200":
+          description: Order cancelled. Wallet and gateway holds are refunded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+  /orders/{id}/dispatch:
+    post:
+      tags: [Dispatch]
+      summary: Offer the order to the nearest online rider
+      description: Food and mart must be ready_for_pickup. Courier and errand can be placed. A repeat offer stays on rider_offered.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderID"
+      responses:
+        "200":
+          description: Offer attempted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+  /orders/{id}/ratings:
+    post:
+      tags: [Support]
+      summary: Rate a party after delivery
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ratee_role, ratee_id, score]
+              properties:
+                ratee_role: {type: string, enum: [customer, rider, merchant]}
+                ratee_id: {type: string, format: uuid}
+                score: {type: integer, minimum: 1, maximum: 5}
+                comment: {type: string, maxLength: 1000}
+      responses:
+        "201":
+          description: Rating stored
+  /orders/{id}/messages:
+    get:
+      tags: [Chat]
+      summary: Order chat history
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderID"
+      responses:
+        "200":
+          description: Latest 50 messages
+    post:
+      tags: [Chat]
+      summary: Send an order chat message
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: {type: string, maxLength: 1000}
+      responses:
+        "201":
+          description: Message stored
+  /merchants/orders:
+    get:
+      tags: [Merchants]
+      summary: Merchant orders for one status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema: {type: string, default: placed}
+      responses:
+        "200":
+          description: Up to 20 orders
+  /merchants/orders/{id}/{action}:
+    post:
+      tags: [Merchants]
+      summary: Accept, prepare, or mark ready
+      description: action is accept, preparing, or ready. ready offers the order to a rider.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderID"
+        - name: action
+          in: path
+          required: true
+          schema: {type: string, enum: [accept, preparing, ready]}
+      responses:
+        "200":
+          description: Status updated
+  /riders/position:
+    post:
+      tags: [Riders]
+      summary: Publish the rider position used for dispatch
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lng]
+              properties:
+                lat: {type: number}
+                lng: {type: number}
+      responses:
+        "200":
+          description: Position stored in Redis for about 45 seconds
+  /riders/offers:
+    get:
+      tags: [Dispatch]
+      summary: Open offers for the signed-in rider
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Up to 20 offers
+  /riders/tasks:
+    get:
+      tags: [Riders]
+      summary: Accepted, picked up, and on-the-way tasks
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Up to 20 tasks
+  /riders/tasks/{id}/accept:
+    post:
+      tags: [Dispatch]
+      summary: Accept an offer
+      description: Wins only while the order is rider_offered and has no rider.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderID"
+      responses:
+        "200":
+          description: Offer accepted
+        "409":
+          $ref: "#/components/responses/Error"
+  /riders/tasks/{id}/reject:
+    post:
+      tags: [Dispatch]
+      summary: Reject an offer
+      description: Updates the offer only. The order stays rider_offered and the next rider can be offered.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderID"
+      responses:
+        "200":
+          description: Offer rejected
+  /riders/tasks/{id}/pickup:
+    post:
+      tags: [Riders]
+      summary: Mark the order picked up
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderID"
+      responses:
+        "200":
+          description: Status is picked_up
+  /riders/tasks/{id}/enroute:
+    post:
+      tags: [Riders]
+      summary: Mark the order on the way
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderID"
+      responses:
+        "200":
+          description: Status is on_the_way
+  /riders/tasks/{id}/deliver:
+    post:
+      tags: [Riders]
+      summary: Deliver the order
+      description: Food and mart require delivery_otp from the customer order. Courier and errand require proof_photo_key. The ledger journal runs in the same transaction.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                delivery_otp: {type: string}
+                proof_photo_key: {type: string}
+      responses:
+        "200":
+          description: Order delivered
+  /payments/webhooks/{provider}:
+    post:
+      tags: [Payments]
+      summary: Idempotent gateway status update
+      description: Returns success when gateway_ref is already in the requested status. provider is jazzcash or easypaisa. This build records a stub gateway_ref of stub-{order_id}.
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [gateway_ref, status]
+              properties:
+                gateway_ref: {type: string}
+                status: {type: string, enum: [held, released, refunded, failed]}
+      responses:
+        "200":
+          description: Status applied or already applied
+  /admin/wallet/credits:
+    post:
+      tags: [Payments]
+      summary: Credit a customer wallet
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [account_id, amount, request_id]
+              properties:
+                account_id: {type: string, format: uuid}
+                amount: {type: string, example: "100.00"}
+                request_id: {type: string}
+      responses:
+        "200":
+          description: Wallet credited
+  /admin/riders/{id}/settle:
+    post:
+      tags: [Payments]
+      summary: Settle rider cash owed
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RiderID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, request_id]
+              properties:
+                amount: {type: string, example: "50.00"}
+                request_id: {type: string}
+      responses:
+        "200":
+          description: Cash owed reduced
+  /tickets:
+    get:
+      tags: [Support]
+      summary: List the caller's tickets
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Up to 20 tickets
+    post:
+      tags: [Support]
+      summary: Open a support ticket
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order_id, body]
+              properties:
+                order_id: {type: string, format: uuid}
+                body: {type: string}
+      responses:
+        "201":
+          description: Ticket opened
+  /tickets/{id}:
+    get:
+      tags: [Support]
+      summary: Get one ticket
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        "200":
+          description: Ticket
+  /tickets/{id}/messages:
+    get:
+      tags: [Support]
+      summary: Ticket messages
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        "200":
+          description: Up to 50 messages
+    post:
+      tags: [Support]
+      summary: Reply on a ticket
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: {type: string}
+      responses:
+        "201":
+          description: Message stored
+  /notifications/devices:
+    post:
+      tags: [Notifications]
+      summary: Register an FCM device token
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: {type: string}
+      responses:
+        "200":
+          description: Token saved
+  /ws/location/{order_id}:
+    get:
+      tags: [Dispatch]
+      summary: Live rider location
+      description: WebSocket. Send Authorization Bearer. The assigned rider publishes {"lat","lng"}. Redis channel order:{id}:location fans the point out. Postgres stays the source for order status.
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        "101":
+          description: Switching protocols
+  /ws/chat/{order_id}:
+    get:
+      tags: [Chat]
+      summary: Live order chat
+      description: WebSocket on the same net/http server as the API. Send Authorization Bearer, then text frames {"body":"..."}. Messages are stored in Postgres. Redis only fans them out.
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        "101":
+          description: Switching protocols
 components:
   securitySchemes:
     bearerAuth:
@@ -527,6 +1113,13 @@ components:
         type: string
         format: uuid
     OrderID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RiderID:
       name: id
       in: path
       required: true
@@ -971,3 +1564,78 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/Order"
+    RiderRegister:
+      type: object
+      required: [phone, name, cnic, cnic_object_key, selfie_object_key, license_object_key, vehicle_reg, zone_id]
+      properties:
+        phone:
+          type: string
+        name:
+          type: string
+        cnic:
+          type: string
+          description: 12345-1234567-1. Stored encrypted. Never returned.
+        cnic_object_key:
+          type: string
+        selfie_object_key:
+          type: string
+        license_object_key:
+          type: string
+        vehicle_reg:
+          type: string
+        zone_id:
+          type: string
+          format: uuid
+    Availability:
+      type: object
+      required: [is_online]
+      properties:
+        is_online:
+          type: boolean
+    Rider:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        verification_status:
+          type: string
+          enum: [pending, approved, rejected, suspended]
+        zone_id:
+          type: string
+          format: uuid
+          nullable: true
+        vehicle_reg:
+          type: string
+        is_online:
+          type: boolean
+        rating:
+          type: string
+        rating_count:
+          type: integer
+        cnic_object_key:
+          type: string
+          nullable: true
+        selfie_object_key:
+          type: string
+          nullable: true
+        license_object_key:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    RiderResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Rider"
+    RiderListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Rider"

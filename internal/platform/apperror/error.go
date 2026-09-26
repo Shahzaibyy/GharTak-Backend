@@ -30,6 +30,10 @@ func Forbidden(message string) error {
 	return &Error{sentinel: ErrForbidden, message: message}
 }
 
+func Conflict(message string) error {
+	return &Error{sentinel: ErrConflict, message: message}
+}
+
 func (e *Error) Error() string { return e.message }
 
 func (e *Error) Unwrap() error { return e.sentinel }

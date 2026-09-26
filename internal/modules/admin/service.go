@@ -30,6 +30,11 @@ func (s *Service) Exists(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+func (s *Service) Active(ctx context.Context, id uuid.UUID) error {
+	_, err := s.ActiveZone(ctx, id)
+	return err
+}
+
 func (s *Service) ActiveZone(ctx context.Context, id uuid.UUID) (Zone, error) {
 	zone, err := s.zones.Get(ctx, id)
 	if err != nil {

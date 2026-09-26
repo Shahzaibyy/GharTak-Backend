@@ -12,9 +12,16 @@ import (
 
 	"github.com/yourusername/ghartak-backend/internal/modules/admin"
 	"github.com/yourusername/ghartak-backend/internal/modules/auth"
+	"github.com/yourusername/ghartak-backend/internal/modules/chat"
 	"github.com/yourusername/ghartak-backend/internal/modules/customers"
+	"github.com/yourusername/ghartak-backend/internal/modules/dispatch"
 	"github.com/yourusername/ghartak-backend/internal/modules/merchants"
+	"github.com/yourusername/ghartak-backend/internal/modules/notifications"
 	"github.com/yourusername/ghartak-backend/internal/modules/orders"
+	"github.com/yourusername/ghartak-backend/internal/modules/payments"
+	"github.com/yourusername/ghartak-backend/internal/modules/realtime"
+	"github.com/yourusername/ghartak-backend/internal/modules/riders"
+	"github.com/yourusername/ghartak-backend/internal/modules/support"
 	"github.com/yourusername/ghartak-backend/internal/platform/httpserver"
 )
 
@@ -27,6 +34,12 @@ type modules struct {
 	merchants *merchants.Handler
 	customers *customers.Handler
 	orders    *orders.Handler
+	riders    *riders.Handler
+	payments  *payments.Handler
+	support   *support.Handler
+	chat      *chat.Handler
+	notify    *notifications.Handler
+	realtime  *realtime.Handler
 }
 
 func (a *application) handler() (http.Handler, error) {
@@ -38,14 +51,25 @@ func (a *application) handler() (http.Handler, error) {
 }
 
 func buildModules(app *application) (modules, error) {
-	adminSvc := admin.NewService(admin.NewRepository(app.pool))
+	adminRepo := admin.NewRepository(app.pool)
+	adminSvc := admin.NewService(adminRepo)
 	merchantSvc := merchants.NewService(merchants.NewRepository(app.pool), adminSvc, app.cfg.PIIKey, app.cfg.PhoneHashKey)
-	if err := maybeSeed(app, merchantSvc); err != nil {
+	if err := maybeSeed(app, adminRepo, merchantSvc); err != nil {
 		return modules{}, err
 	}
 	store := auth.NewRedisStore(app.redis)
 	authSvc := auth.NewService(auth.NewRepository(app.pool), store, store, store, app.cfg.PIIKey, app.cfg.PhoneHashKey, app.cfg.JWTKey, app.cfg.AppEnv == "development")
-	orderSvc := orders.NewService(adminSvc, merchantSvc, orders.NewRepository(app.pool))
+	payRepo := payments.NewRepository(app.pool)
+	noteRepo := notifications.NewRepository(app.pool)
+	sender := notifications.NewSender(app.log, app.cfg.FCMServerKey, noteRepo)
+	geo := dispatch.NewGeo(app.redis)
+	dispSvc := dispatch.NewService(dispatch.NewRepository(app.pool), geo)
+	orderRepo := orders.NewRepository(app.pool).WithBooks(payRepo)
+	orderSvc := orders.NewService(adminSvc, merchantSvc, orderRepo).WithFlow(app.cfg.PhoneHashKey, sender, dispSvc)
+	riderSvc := riders.NewService(riders.NewRepository(app.pool), adminSvc, app.cfg.PIIKey, app.cfg.PhoneHashKey)
+	riderSvc.UsePresence(geo)
+	chatSvc := chat.NewService(chat.NewRepository(app.pool), orderSvc, app.redis, app.log)
+	supportSvc := support.NewService(support.NewRepository(app.pool))
 	return modules{
 		log: app.log, pool: app.pool, jwt: app.cfg.JWTKey,
 		auth:      auth.NewHandler(authSvc, app.log),
@@ -53,19 +77,29 @@ func buildModules(app *application) (modules, error) {
 		merchants: merchants.NewHandler(merchantSvc, app.log),
 		customers: customers.NewHandler(customers.NewService(customers.NewRepository(app.pool)), app.log),
 		orders:    orders.NewHandler(orderSvc, app.log),
+		riders:    riders.NewHandler(riderSvc, app.log),
+		payments:  payments.NewHandler(payments.NewService(payRepo), app.log),
+		support:   support.NewHandler(supportSvc, app.log),
+		chat:      chat.NewHandler(chatSvc, app.log),
+		notify:    notifications.NewHandler(sender, app.log),
+		realtime:  realtime.NewHandler(app.cfg.JWTKey, app.redis, orderSvc, chatSvc, app.log),
 	}, nil
 }
 
-func maybeSeed(app *application, merchantsSvc *merchants.Service) error {
+func maybeSeed(app *application, adminRepo *admin.Repository, merchantsSvc *merchants.Service) error {
 	if app.cfg.AppEnv != "development" {
 		return nil
 	}
-	return merchantsSvc.SeedDemo(context.Background())
+	if err := merchantsSvc.SeedDemo(context.Background()); err != nil {
+		return err
+	}
+	return adminRepo.SeedDemoAdmin(context.Background(), app.cfg.PIIKey, app.cfg.PhoneHashKey)
 }
 
 func routes(m modules) http.Handler {
 	limiter := httpserver.NewLimiter(120, time.Minute)
 	router := httpserver.NewMux(m.log)
+	mountSockets(router, m)
 	router.Group(func(r chi.Router) {
 		r.Use(middleware.Timeout(15 * time.Second))
 		r.Use(limiter.Middleware)
@@ -74,6 +108,11 @@ func routes(m modules) http.Handler {
 		privateRoutes(r, m)
 	})
 	return router
+}
+
+func mountSockets(r chi.Router, m modules) {
+	r.Get("/ws/location/{order_id}", m.realtime.Location)
+	r.Get("/ws/chat/{order_id}", m.realtime.Chat)
 }
 
 func publicRoutes(r chi.Router, m modules) {
@@ -85,13 +124,18 @@ func publicRoutes(r chi.Router, m modules) {
 	r.Post("/merchants/register", m.merchants.Register)
 	r.Get("/merchants", m.merchants.List)
 	r.Get("/merchants/{id}/catalog", m.merchants.Catalog)
+	r.Post("/riders/register", m.riders.Register)
+	r.Post("/payments/webhooks/{provider}", m.payments.Webhook)
 }
 
 func privateRoutes(r chi.Router, m modules) {
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RequireAuth(m.jwt))
+		sharedRoutes(r, m)
 		customerRoutes(r, m)
 		merchantRoutes(r, m)
+		riderRoutes(r, m)
+		adminRoutes(r, m)
 	})
 }
 
@@ -105,6 +149,48 @@ func customerRoutes(r chi.Router, m modules) {
 		r.Post("/orders/quote", m.orders.Quote)
 		r.Post("/orders", m.orders.Place)
 		r.Get("/orders/{id}", m.orders.Get)
+		r.Post("/orders/{id}/cancel", m.orders.Cancel)
+		r.Post("/tickets", m.support.Open)
+		r.Get("/tickets", m.support.List)
+		r.Get("/tickets/{id}", m.support.Get)
+		r.Get("/tickets/{id}/messages", m.support.Messages)
+		r.Post("/tickets/{id}/messages", m.support.Reply)
+	})
+}
+
+func sharedRoutes(r chi.Router, m modules) {
+	r.Post("/notifications/devices", m.notify.Register)
+	r.Get("/orders/{id}/messages", m.chat.List)
+	r.Post("/orders/{id}/messages", m.chat.Send)
+	r.Post("/orders/{id}/dispatch", m.orders.Dispatch)
+	r.Post("/orders/{id}/ratings", m.support.Rate)
+}
+
+func riderRoutes(r chi.Router, m modules) {
+	r.Group(func(r chi.Router) {
+		r.Use(auth.RequireRole(auth.RoleRider))
+		r.Get("/riders/me", m.riders.Me)
+		r.Post("/riders/availability", m.riders.Availability)
+		r.Post("/riders/position", m.riders.Position)
+		r.Get("/riders/offers", m.orders.Offers)
+		r.Get("/riders/tasks", m.orders.Tasks)
+		r.Post("/riders/tasks/{id}/accept", m.orders.Accept)
+		r.Post("/riders/tasks/{id}/reject", m.orders.Reject)
+		r.Post("/riders/tasks/{id}/pickup", m.orders.Pickup)
+		r.Post("/riders/tasks/{id}/enroute", m.orders.Enroute)
+		r.Post("/riders/tasks/{id}/deliver", m.orders.Deliver)
+	})
+}
+
+func adminRoutes(r chi.Router, m modules) {
+	r.Group(func(r chi.Router) {
+		r.Use(auth.RequireRole(auth.RoleAdmin))
+		r.Get("/admin/riders", m.riders.Queue)
+		r.Post("/admin/riders/{id}/approve", m.riders.Approve)
+		r.Post("/admin/riders/{id}/reject", m.riders.Reject)
+		r.Post("/admin/riders/{id}/suspend", m.riders.Suspend)
+		r.Post("/admin/riders/{id}/settle", m.payments.SettleCash)
+		r.Post("/admin/wallet/credits", m.payments.CreditWallet)
 	})
 }
 
@@ -114,5 +200,7 @@ func merchantRoutes(r chi.Router, m modules) {
 		r.Post("/merchants/{id}/catalog", m.merchants.AddItem)
 		r.Patch("/merchants/{id}/catalog/{item_id}", m.merchants.UpdateItem)
 		r.Delete("/merchants/{id}/catalog/{item_id}", m.merchants.DeleteItem)
+		r.Get("/merchants/orders", m.orders.MerchantOrders)
+		r.Post("/merchants/orders/{id}/{action}", m.orders.MerchantAction)
 	})
 }

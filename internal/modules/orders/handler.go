@@ -18,6 +18,16 @@ type orderAPI interface {
 	Quote(ctx context.Context, in PlaceInput) (Priced, error)
 	Place(ctx context.Context, customerID uuid.UUID, in PlaceInput) (Order, bool, error)
 	Get(ctx context.Context, customerID, orderID uuid.UUID) (Order, error)
+	ListMerchant(ctx context.Context, merchantID uuid.UUID, status Status) ([]Order, error)
+	ListOffers(ctx context.Context, riderID uuid.UUID) ([]Order, error)
+	ListTasks(ctx context.Context, riderID uuid.UUID) ([]Order, error)
+	MerchantAction(ctx context.Context, merchantID, orderID uuid.UUID, action string) (Order, error)
+	RiderAction(ctx context.Context, riderID, orderID uuid.UUID, action string) (Order, error)
+	Accept(ctx context.Context, riderID, orderID uuid.UUID) (Order, error)
+	Reject(ctx context.Context, riderID, orderID uuid.UUID) (Order, error)
+	Deliver(ctx context.Context, riderID, orderID uuid.UUID, otp, proof string) (Order, error)
+	Cancel(ctx context.Context, customerID, orderID uuid.UUID, reason string) (Order, error)
+	DispatchFor(ctx context.Context, role string, actor, orderID uuid.UUID) (Order, error)
 }
 
 type Handler struct {

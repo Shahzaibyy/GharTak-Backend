@@ -12,10 +12,16 @@ import (
 var openAPISpec []byte
 
 func mountDocs(r chi.Router) {
-	r.Get("/docs", docsRedirect)
-	r.Mount("/docs/", swaggerui.Handler(openAPISpec))
+	r.Mount("/docs", docsHandler())
 }
 
-func docsRedirect(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "/docs/", http.StatusFound)
+func docsHandler() http.Handler {
+	ui := http.StripPrefix("/docs", swaggerui.Handler(openAPISpec))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/docs" {
+			http.Redirect(w, r, "/docs/", http.StatusFound)
+			return
+		}
+		ui.ServeHTTP(w, r)
+	})
 }

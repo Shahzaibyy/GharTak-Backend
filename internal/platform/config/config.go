@@ -20,6 +20,7 @@ type Config struct {
 	PIIKey        []byte
 	PhoneHashKey  []byte
 	JWTKey        []byte
+	FCMServerKey  string
 }
 
 func Load() (Config, error) {
@@ -57,6 +58,7 @@ func fromEnv() (Config, error) {
 		PIIKey:        pii,
 		PhoneHashKey:  hash,
 		JWTKey:        jwtKey,
+		FCMServerKey:  os.Getenv("FCM_SERVER_KEY"),
 	}, nil
 }
 
