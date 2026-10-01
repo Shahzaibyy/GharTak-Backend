@@ -22,7 +22,9 @@ import (
 	"github.com/yourusername/ghartak-backend/internal/modules/realtime"
 	"github.com/yourusername/ghartak-backend/internal/modules/riders"
 	"github.com/yourusername/ghartak-backend/internal/modules/support"
+	"github.com/yourusername/ghartak-backend/internal/platform/events"
 	"github.com/yourusername/ghartak-backend/internal/platform/httpserver"
+	"github.com/yourusername/ghartak-backend/internal/platform/queue"
 	"github.com/yourusername/ghartak-backend/internal/platform/uploads"
 )
 
@@ -41,42 +43,65 @@ type modules struct {
 	chat      *chat.Handler
 	notify    *notifications.Handler
 	realtime  *realtime.Handler
-	uploads   *uploads.Handler
+	uploads       *uploads.Handler
+	queueMonitor  http.Handler
 }
 
 func (a *application) handler() (http.Handler, error) {
-	built, err := buildModules(a)
+	built, bg, err := buildModules(a)
 	if err != nil {
 		return nil, err
 	}
+	a.bg = bg
 	return routes(built), nil
 }
 
-func buildModules(app *application) (modules, error) {
+func buildModules(app *application) (modules, *background, error) {
 	adminRepo := admin.NewRepository(app.pool)
 	adminSvc := admin.NewService(adminRepo)
 	merchantSvc := merchants.NewService(merchants.NewRepository(app.pool), adminSvc, app.cfg.PIIKey, app.cfg.PhoneHashKey)
 	if err := maybeSeed(app, adminRepo, merchantSvc); err != nil {
-		return modules{}, err
+		return modules{}, nil, err
+	}
+	queueClient, err := queue.NewClient(app.cfg.QueueRedisURL())
+	if err != nil {
+		return modules{}, nil, err
+	}
+	bus, nats, _, err := events.Open(app.cfg.NATSURL, queueClient)
+	if err != nil {
+		queueClient.Close()
+		return modules{}, nil, err
 	}
 	store := auth.NewRedisStore(app.redis)
 	authSvc := auth.NewService(auth.NewRepository(app.pool), store, store, store, app.cfg.PIIKey, app.cfg.PhoneHashKey, app.cfg.JWTKey, app.cfg.AppEnv == "development")
 	identity, err := auth.OpenIdentity(context.Background(), app.cfg.FirebaseProjectID, app.cfg.FirebaseCredentialsFile, app.cfg.FirebaseCredentialsJSON)
 	if err != nil {
-		return modules{}, err
+		queueClient.Close()
+		return modules{}, nil, err
 	}
 	authSvc.UseIdentity(identity)
 	payRepo := payments.NewRepository(app.pool)
 	noteRepo := notifications.NewRepository(app.pool)
 	sender := notifications.NewSender(app.log, app.cfg.FCMServerKey, noteRepo)
+	notifier := notifications.NewEventNotifier(bus)
 	geo := dispatch.NewGeo(app.redis)
-	dispSvc := dispatch.NewService(dispatch.NewRepository(app.pool), geo)
+	dispSvc := dispatch.NewService(dispatch.NewRepository(app.pool), geo).UseOfferTimer(queue.NewOfferTimer(queueClient))
 	orderRepo := orders.NewRepository(app.pool).WithBooks(payRepo)
-	orderSvc := orders.NewService(adminSvc, merchantSvc, orderRepo).WithFlow(app.cfg.PhoneHashKey, sender, dispSvc).UsePhoneGate(authSvc)
+	orderSvc := orders.NewService(adminSvc, merchantSvc, orderRepo).WithFlow(app.cfg.PhoneHashKey, notifier, dispSvc).UsePhoneGate(authSvc)
 	riderSvc := riders.NewService(riders.NewRepository(app.pool), adminSvc, app.cfg.PIIKey, app.cfg.PhoneHashKey)
 	riderSvc.UsePresence(geo)
 	chatSvc := chat.NewService(chat.NewRepository(app.pool), orderSvc, app.redis, app.log)
 	supportSvc := support.NewService(support.NewRepository(app.pool))
+	monitor, err := queue.MonitorHandler(app.cfg.QueueRedisURL())
+	if err != nil {
+		queueClient.Close()
+		return modules{}, nil, err
+	}
+	bg, err := startBackground(context.Background(), app.cfg, app.log, queueClient, nats, sender, dispSvc)
+	if err != nil {
+		queueClient.Close()
+		return modules{}, nil, err
+	}
 	return modules{
 		log: app.log, pool: app.pool, jwt: app.cfg.JWTKey,
 		auth:      auth.NewHandler(authSvc, app.log),
@@ -94,7 +119,8 @@ func buildModules(app *application) (modules, error) {
 			Endpoint: app.cfg.S3Endpoint, Bucket: app.cfg.S3Bucket, Region: app.cfg.S3Region,
 			AccessKey: app.cfg.S3AccessKey, SecretKey: app.cfg.S3SecretKey,
 		}), auth.AccountID, app.log),
-	}, nil
+		queueMonitor: monitor,
+	}, bg, nil
 }
 
 func maybeSeed(app *application, adminRepo *admin.Repository, merchantsSvc *merchants.Service) error {
@@ -204,6 +230,9 @@ func riderRoutes(r chi.Router, m modules) {
 func adminRoutes(r chi.Router, m modules) {
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RequireRole(auth.RoleAdmin))
+		if m.queueMonitor != nil {
+			r.Handle("/admin/queue/*", m.queueMonitor)
+		}
 		r.Get("/admin/riders", m.riders.Queue)
 		r.Post("/admin/riders/{id}/approve", m.riders.Approve)
 		r.Post("/admin/riders/{id}/reject", m.riders.Reject)

@@ -15,6 +15,9 @@ type Config struct {
 	HTTPAddr                string
 	DatabaseURL             string
 	RedisURL                string
+	RedisQueueURL           string
+	NATSURL                 string
+	RunAsynqWorker          bool
 	MigrationsDir           string
 	DBMaxConns              int32
 	PIIKey                  []byte
@@ -61,6 +64,9 @@ func fromEnv() (Config, error) {
 		HTTPAddr:                env("HTTP_ADDR", ":8080"),
 		DatabaseURL:             os.Getenv("DATABASE_URL"),
 		RedisURL:                env("REDIS_URL", "redis://localhost:6379/0"),
+		RedisQueueURL:           os.Getenv("REDIS_QUEUE_URL"),
+		NATSURL:                 os.Getenv("NATS_URL"),
+		RunAsynqWorker:          envBool("RUN_ASYNQ_WORKER", true),
 		MigrationsDir:           env("MIGRATIONS_DIR", "migrations"),
 		DBMaxConns:              maxConns,
 		PIIKey:                  pii,
@@ -143,6 +149,21 @@ func decodeKey(name, raw string) ([]byte, error) {
 		return nil, fmt.Errorf("config: %s must be standard base64: %w", name, err)
 	}
 	return key, nil
+}
+
+func (c Config) QueueRedisURL() string {
+	if c.RedisQueueURL != "" {
+		return c.RedisQueueURL
+	}
+	return c.RedisURL
+}
+
+func envBool(name string, fallback bool) bool {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return fallback
+	}
+	return raw == "1" || raw == "true" || raw == "TRUE"
 }
 
 func env(name, fallback string) string {

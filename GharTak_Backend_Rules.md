@@ -140,6 +140,9 @@ Rules:
 
 ## 6. Redis Best Practices
 
+- Use two Redis endpoints in production when possible: `REDIS_URL` for cache, OTP, sessions, geo, and pub/sub; `REDIS_QUEUE_URL` for asynq only with AOF (`appendonly yes`) and `maxmemory-policy noeviction`. Never run asynq on an `allkeys-lru` instance.
+- Background work goes through `internal/platform/queue` (asynq): retries with backoff, delayed jobs, priority queues (`critical`, `default`, `low`), cron via the scheduler, unique task ids, and task timeouts. FCM and offer re-dispatch run in the worker, not in the HTTP transaction.
+- Cross-module fan-out uses `internal/platform/events`. With `NATS_URL` set, order status is published on JetStream subject `ghartak.events.order.status` and the worker enqueues notification jobs. Without NATS, the direct publisher enqueues the same jobs.
 - Redis is a cache/ephemeral layer, never the source of truth for money or order state — Postgres is authoritative. If Redis is flushed, no financial state should be lost.
 - Every cache key has a `TTL`. No unbounded keys.
 - Use the right structure for the job: `GEOADD`/`GEOSEARCH` for rider positions, `HASH` for structured objects needing partial field updates, plain `SET`/`GET` for simple cached values — not everything as a serialized JSON blob.

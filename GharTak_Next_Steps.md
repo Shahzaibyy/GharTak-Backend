@@ -198,6 +198,14 @@ Module: `internal/modules/admin`, plus a scheduled job.
 - Fraud job counts delivered pairs and inserts one open `fraud_flags` row when the pair crosses the threshold. The partial unique index blocks duplicates.
 - Merchant payout reads `merchant_payable` from the ledger. It does not add a second balance column until a profile shows the sum is too slow.
 
+## Background jobs and events (implemented)
+
+- **Cache Redis** (`REDIS_URL`): OTP, refresh tokens, rider geo, live location and chat pub/sub. Local compose uses `allkeys-lru` and no AOF.
+- **Queue Redis** (`REDIS_QUEUE_URL`): asynq only. Local compose service `redis-queue` on port `6380` with AOF and `noeviction`. Production should use a separate Upstash/Render instance with the same policy.
+- **Worker**: runs inside the API when `RUN_ASYNQ_WORKER=true`, or as `go run ./cmd/worker` with the same env. Handles FCM (`low` queue, retries), rider offer timeout re-dispatch (`critical`, delayed 30s, unique per order), and nightly fraud scan cron (stub until Step 12 fraud job lands).
+- **NATS** (optional `NATS_URL`): JetStream stream `GHARTAK`, subject `ghartak.events.order.status`. API publishes; worker durable consumer enqueues notification tasks. Without NATS, events enqueue asynq directly.
+- **asynqmon**: admin-only UI at `/admin/queue/` (Bearer admin JWT).
+
 ## Step 13 — Hardening
 
 - `govulncheck` in CI.

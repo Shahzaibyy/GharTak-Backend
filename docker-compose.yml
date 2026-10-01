@@ -32,5 +32,18 @@ services:
       - --maxmemory-policy
       - allkeys-lru
 
+  redis-queue:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - noeviction
+
 volumes:
   ghartak_pg:

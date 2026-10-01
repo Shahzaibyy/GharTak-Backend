@@ -20,13 +20,23 @@ type nearest interface {
 	Nearest(ctx context.Context, zoneID uuid.UUID, lng, lat float64, km int, skip map[uuid.UUID]struct{}) (uuid.UUID, error)
 }
 
+type offerTimer interface {
+	ScheduleOfferTimeout(ctx context.Context, orderID uuid.UUID) error
+}
+
 type Service struct {
-	store store
-	geo   nearest
+	store   store
+	geo     nearest
+	timeouts offerTimer
 }
 
 func NewService(store store, geo nearest) *Service {
 	return &Service{store: store, geo: geo}
+}
+
+func (s *Service) UseOfferTimer(timer offerTimer) *Service {
+	s.timeouts = timer
+	return s
 }
 
 func (s *Service) Offer(ctx context.Context, orderID uuid.UUID) error {
@@ -51,7 +61,17 @@ func (s *Service) offerNearest(ctx context.Context, view View) error {
 	if rider == uuid.Nil {
 		return nil
 	}
-	return s.store.SaveOffer(ctx, view, rider)
+	if err := s.store.SaveOffer(ctx, view, rider); err != nil {
+		return err
+	}
+	return s.scheduleTimeout(ctx, view.ID)
+}
+
+func (s *Service) scheduleTimeout(ctx context.Context, orderID uuid.UUID) error {
+	if s.timeouts == nil {
+		return nil
+	}
+	return s.timeouts.ScheduleOfferTimeout(ctx, orderID)
 }
 
 func (s *Service) pick(ctx context.Context, view View) (uuid.UUID, error) {

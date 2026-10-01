@@ -26,6 +26,7 @@ type application struct {
 	log    zerolog.Logger
 	pool   *pgxpool.Pool
 	redis  *redis.Client
+	bg     *background
 	server *http.Server
 }
 
@@ -82,6 +83,9 @@ func connectApp(ctx context.Context, cfg config.Config, log zerolog.Logger) (*ap
 }
 
 func (a *application) close() {
+	if a.bg != nil {
+		a.bg.close()
+	}
 	a.pool.Close()
 	if a.redis != nil {
 		_ = a.redis.Close()
