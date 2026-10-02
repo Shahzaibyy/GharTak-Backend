@@ -32,9 +32,9 @@ func TestSearchValidation(t *testing.T) {
 		url  string
 		code string
 	}{
-		{name: "short q", url: "/geo/search?q=ab", code: "invalid_argument"},
-		{name: "bad limit", url: "/geo/search?q=attock&limit=9", code: "invalid_argument"},
-		{name: "bad near", url: "/geo/search?q=attock&near_lat=999&near_lng=1", code: "invalid_argument"},
+		{name: "short q", url: "/geo/search?q=ab", code: "invalid_input"},
+		{name: "bad limit", url: "/geo/search?q=attock&limit=9", code: "invalid_input"},
+		{name: "bad near", url: "/geo/search?q=attock&near_lat=999&near_lng=1", code: "invalid_input"},
 		{name: "ok", url: "/geo/search?q=attock&limit=3", code: ""},
 	}
 	for _, tc := range cases {
@@ -62,9 +62,9 @@ func TestReverseValidation(t *testing.T) {
 		url  string
 		code string
 	}{
-		{name: "missing lat", url: "/geo/reverse?lng=72.3", code: "invalid_argument"},
-		{name: "bad lng", url: "/geo/reverse?lat=33.7&lng=abc", code: "invalid_argument"},
-		{name: "out of range", url: "/geo/reverse?lat=91&lng=72.3", code: "invalid_argument"},
+		{name: "missing lat", url: "/geo/reverse?lng=72.3", code: "invalid_input"},
+		{name: "bad lng", url: "/geo/reverse?lat=33.7&lng=abc", code: "invalid_input"},
+		{name: "out of range", url: "/geo/reverse?lat=91&lng=72.3", code: "invalid_input"},
 		{name: "ok", url: "/geo/reverse?lat=33.7&lng=72.3", code: ""},
 	}
 	for _, tc := range cases {
