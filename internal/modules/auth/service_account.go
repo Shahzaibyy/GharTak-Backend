@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -179,10 +178,15 @@ func (s *Service) SetPreferences(ctx context.Context, id uuid.UUID, types []stri
 }
 
 func (s *Service) allowEmail(ctx context.Context, ip, email string) error {
-	if err := s.limits.Allow(ctx, "rl:otp:ip:"+ip, ipLimit, time.Hour); err != nil {
-		return err
-	}
-	return s.limits.Allow(ctx, "rl:otp:email:"+email, phoneLimit, time.Hour)
+	// OTP rate limit disabled for demo/testing — re-enable when needed:
+	// if err := s.limits.Allow(ctx, "rl:otp:ip:"+ip, ipLimit, time.Hour); err != nil {
+	// 	return err
+	// }
+	// return s.limits.Allow(ctx, "rl:otp:email:"+email, phoneLimit, time.Hour)
+	_ = ctx
+	_ = ip
+	_ = email
+	return nil
 }
 
 func normalizeEmail(raw string) (string, error) {

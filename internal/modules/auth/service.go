@@ -176,10 +176,15 @@ func (s *Service) seal(raw string) (sealedPhone, error) {
 }
 
 func (s *Service) allow(ctx context.Context, ip, lookup string) error {
-	if err := s.limits.Allow(ctx, "rl:otp:ip:"+ip, ipLimit, time.Hour); err != nil {
-		return err
-	}
-	return s.limits.Allow(ctx, "rl:otp:phone:"+lookup, phoneLimit, time.Hour)
+	// OTP rate limit disabled for demo/testing — re-enable when needed:
+	// if err := s.limits.Allow(ctx, "rl:otp:ip:"+ip, ipLimit, time.Hour); err != nil {
+	// 	return err
+	// }
+	// return s.limits.Allow(ctx, "rl:otp:phone:"+lookup, phoneLimit, time.Hour)
+	_ = ctx
+	_ = ip
+	_ = lookup
+	return nil
 }
 
 func (s *Service) issueOTP(ctx context.Context, role Role, lookup string, channel notify.Channel, destination string) (OTPResult, error) {
