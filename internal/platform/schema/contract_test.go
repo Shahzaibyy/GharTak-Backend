@@ -71,6 +71,34 @@ func TestZoneSeedMatchesGo(t *testing.T) {
 	}
 }
 
+func TestOnboardingConstraintsMatchGo(t *testing.T) {
+	body := readMigration(t, "0009_onboarding_screens.up.sql")
+	tests := []struct {
+		name       string
+		constraint string
+		want       []string
+	}{
+		{name: "vehicle type", constraint: "riders_vehicle_type_check", want: asStrings(domain.VehicleTypes())},
+		{name: "orientation", constraint: "riders_orientation_status_check", want: asStrings(domain.OrientationStatuses())},
+		{name: "onboarding step", constraint: "riders_onboarding_step_check", want: asStrings(domain.RiderOnboardingSteps())},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			equalSet(t, tt.constraint, nullableConstraintLiterals(t, body, tt.constraint), tt.want)
+		})
+	}
+}
+
+func nullableConstraintLiterals(t *testing.T, body, name string) []string {
+	t.Helper()
+	pattern := `(?s)CONSTRAINT ` + regexp.QuoteMeta(name) + `[\s\S]*?IN \((.*?)\)`
+	match := regexp.MustCompile(pattern).FindStringSubmatch(body)
+	if match == nil {
+		t.Fatalf("constraint %s not found", name)
+	}
+	return quotedList(match[1])
+}
+
 func activeWord(active bool) string {
 	if active {
 		return "true"

@@ -21,8 +21,11 @@ type purposeRule struct {
 
 var purposeRules = map[string]purposeRule{
 	"cnic":              {prefix: "cnic", contentType: "image/jpeg", maxBytes: 2 << 20},
+	"cnic_front":        {prefix: "cnic", contentType: "image/jpeg", maxBytes: 2 << 20},
+	"cnic_back":         {prefix: "cnic", contentType: "image/jpeg", maxBytes: 2 << 20},
 	"selfie":            {prefix: "selfie", contentType: "image/jpeg", maxBytes: 2 << 20},
 	"vehicle_doc":       {prefix: "vehicle", contentType: "image/jpeg", maxBytes: 5 << 20},
+	"driving_licence":   {prefix: "vehicle", contentType: "image/jpeg", maxBytes: 5 << 20},
 	"catalog_photo":     {prefix: "catalog", contentType: "image/jpeg", maxBytes: 8 << 20},
 	"proof_of_delivery": {prefix: "proof", contentType: "image/jpeg", maxBytes: 8 << 20},
 }

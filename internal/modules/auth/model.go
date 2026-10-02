@@ -21,9 +21,10 @@ type Session struct {
 }
 
 type OTPRequest struct {
-	Phone string
-	Role  Role
-	IP    string
+	Phone   string
+	Role    Role
+	IP      string
+	Channel string
 }
 
 type VerifyRequest struct {
@@ -32,13 +33,24 @@ type VerifyRequest struct {
 	OTP   string
 }
 
+type EmailOTPRequest struct {
+	Email string
+	IP    string
+}
+
+type EmailVerifyRequest struct {
+	Email string
+	OTP   string
+}
+
 type Profile struct {
-	ID            uuid.UUID   `json:"id"`
-	Name          *string     `json:"name"`
-	Email         *string     `json:"email"`
-	Phone         *string     `json:"phone"`
-	PhoneVerified bool        `json:"phone_verified"`
-	WalletBalance money.Money `json:"wallet_balance"`
+	ID                   uuid.UUID   `json:"id"`
+	Name                 *string     `json:"name"`
+	Email                *string     `json:"email"`
+	Phone                *string     `json:"phone"`
+	PhoneVerified        bool        `json:"phone_verified"`
+	WalletBalance        money.Money `json:"wallet_balance"`
+	PreferredOrderTypes  []string    `json:"preferred_order_types,omitempty"`
 }
 
 type Identity struct {
@@ -54,12 +66,13 @@ type googleInsert struct {
 }
 
 type profileRow struct {
-	ID            uuid.UUID
-	Name          *string
-	Email         *string
-	PhoneCipher   *string
-	PhoneVerified bool
-	Wallet        string
+	ID                  uuid.UUID
+	Name                *string
+	Email               *string
+	PhoneCipher         *string
+	PhoneVerified       bool
+	Wallet              string
+	PreferredOrderTypes []string
 }
 
 type userLock struct {

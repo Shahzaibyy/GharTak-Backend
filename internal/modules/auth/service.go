@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/yourusername/ghartak-backend/internal/platform/apperror"
+	"github.com/yourusername/ghartak-backend/internal/platform/notify"
 	"github.com/yourusername/ghartak-backend/internal/platform/pii"
 )
 
@@ -50,9 +51,12 @@ type accountStore interface {
 	UpsertCustomer(ctx context.Context, ciphertext, lookup string) (Account, error)
 	Find(ctx context.Context, role Role, lookup string) (Account, error)
 	FindByFirebase(ctx context.Context, uid string) (Account, error)
+	FindByEmail(ctx context.Context, email string) (Account, error)
 	InsertGoogle(ctx context.Context, row googleInsert) (Account, error)
+	InsertEmail(ctx context.Context, email string) (Account, error)
 	Profile(ctx context.Context, id uuid.UUID) (profileRow, error)
 	UpdateName(ctx context.Context, id uuid.UUID, name string) (profileRow, error)
+	SetPreferences(ctx context.Context, id uuid.UUID, types []string) (profileRow, error)
 	AttachPhone(ctx context.Context, id uuid.UUID, ciphertext, lookup string) error
 	PhoneVerified(ctx context.Context, id uuid.UUID) (bool, error)
 	SoftDelete(ctx context.Context, id uuid.UUID) error
@@ -60,6 +64,14 @@ type accountStore interface {
 
 type tokenVerifier interface {
 	Verify(ctx context.Context, idToken string) (Identity, error)
+}
+
+type otpSender interface {
+	Send(ctx context.Context, channel notify.Channel, destination, code string) error
+}
+
+type riderBootstrap interface {
+	EnsureFromApply(ctx context.Context, ciphertext, lookup string) (Account, error)
 }
 
 type Service struct {
@@ -72,6 +84,8 @@ type Service struct {
 	jwtKey   []byte
 	dev      bool
 	identity tokenVerifier
+	sender   otpSender
+	riders   riderBootstrap
 	now      func() time.Time
 }
 
@@ -93,7 +107,19 @@ func (s *Service) UseIdentity(verifier tokenVerifier) {
 	s.identity = verifier
 }
 
+func (s *Service) UseSender(sender otpSender) {
+	s.sender = sender
+}
+
+func (s *Service) UseRiderBootstrap(riders riderBootstrap) {
+	s.riders = riders
+}
+
 func (s *Service) RequestOTP(ctx context.Context, req OTPRequest) (OTPResult, error) {
+	channel, err := notify.ParsePhoneChannel(req.Channel)
+	if err != nil {
+		return OTPResult{}, err
+	}
 	sealed, err := s.seal(req.Phone)
 	if err != nil {
 		return OTPResult{}, err
@@ -101,7 +127,7 @@ func (s *Service) RequestOTP(ctx context.Context, req OTPRequest) (OTPResult, er
 	if err := s.allow(ctx, req.IP, sealed.lookup); err != nil {
 		return OTPResult{}, err
 	}
-	return s.issueOTP(ctx, req.Role, sealed.lookup)
+	return s.issueOTP(ctx, req.Role, sealed.lookup, channel, req.Phone)
 }
 
 func (s *Service) Verify(ctx context.Context, req VerifyRequest) (Session, error) {
@@ -156,7 +182,7 @@ func (s *Service) allow(ctx context.Context, ip, lookup string) error {
 	return s.limits.Allow(ctx, "rl:otp:phone:"+lookup, phoneLimit, time.Hour)
 }
 
-func (s *Service) issueOTP(ctx context.Context, role Role, lookup string) (OTPResult, error) {
+func (s *Service) issueOTP(ctx context.Context, role Role, lookup string, channel notify.Channel, destination string) (OTPResult, error) {
 	code, err := newOTP()
 	if err != nil {
 		return OTPResult{}, err
@@ -164,7 +190,17 @@ func (s *Service) issueOTP(ctx context.Context, role Role, lookup string) (OTPRe
 	if err := s.codes.Save(ctx, otpKey(role, lookup), hashOTP(s.jwtKey, code), otpTTL); err != nil {
 		return OTPResult{}, err
 	}
+	if err := s.dispatchOTP(ctx, channel, destination, code); err != nil {
+		return OTPResult{}, err
+	}
 	return OTPResult{DevOTP: s.devCode(code)}, nil
+}
+
+func (s *Service) dispatchOTP(ctx context.Context, channel notify.Channel, destination, code string) error {
+	if s.sender == nil {
+		return nil
+	}
+	return s.sender.Send(ctx, channel, destination, code)
 }
 
 func (s *Service) devCode(code string) string {
@@ -218,10 +254,20 @@ func (s *Service) accountFor(ctx context.Context, role Role, sealed sealedPhone)
 		return s.accounts.UpsertCustomer(ctx, sealed.ciphertext, sealed.lookup)
 	}
 	account, err := s.accounts.Find(ctx, role, sealed.lookup)
+	if errors.Is(err, apperror.ErrNotFound) && role == RoleRider {
+		return s.ensureRider(ctx, sealed)
+	}
 	if errors.Is(err, apperror.ErrNotFound) {
 		return Account{}, apperror.Unauthorized("account is not registered")
 	}
 	return account, err
+}
+
+func (s *Service) ensureRider(ctx context.Context, sealed sealedPhone) (Account, error) {
+	if s.riders == nil {
+		return Account{}, apperror.Unauthorized("account is not registered")
+	}
+	return s.riders.EnsureFromApply(ctx, sealed.ciphertext, sealed.lookup)
 }
 
 func allowStatus(status string) error {

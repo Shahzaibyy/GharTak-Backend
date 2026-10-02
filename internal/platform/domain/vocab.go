@@ -58,3 +58,53 @@ func EventActorRoles() []ActorRole {
 func RatingRoles() []ActorRole {
 	return []ActorRole{RoleCustomer, RoleRider, RoleMerchant}
 }
+
+type VehicleType string
+
+const (
+	VehicleMotorcycle VehicleType = "motorcycle"
+	VehicleBicycle    VehicleType = "bicycle"
+)
+
+func VehicleTypes() []VehicleType {
+	return []VehicleType{VehicleMotorcycle, VehicleBicycle}
+}
+
+type OrientationStatus string
+
+const (
+	OrientationNone      OrientationStatus = "none"
+	OrientationBooked    OrientationStatus = "booked"
+	OrientationCompleted OrientationStatus = "completed"
+)
+
+func OrientationStatuses() []OrientationStatus {
+	return []OrientationStatus{OrientationNone, OrientationBooked, OrientationCompleted}
+}
+
+type RiderOnboardingStep string
+
+const (
+	OnboardingApplied    RiderOnboardingStep = "applied"
+	OnboardingDetails    RiderOnboardingStep = "details"
+	OnboardingDocuments  RiderOnboardingStep = "documents"
+	OnboardingSubmitted  RiderOnboardingStep = "submitted"
+)
+
+func RiderOnboardingSteps() []RiderOnboardingStep {
+	return []RiderOnboardingStep{
+		OnboardingApplied, OnboardingDetails, OnboardingDocuments, OnboardingSubmitted,
+	}
+}
+
+type AddressLabel string
+
+const (
+	AddressHome  AddressLabel = "home"
+	AddressWork  AddressLabel = "work"
+	AddressOther AddressLabel = "other"
+)
+
+func AddressLabels() []AddressLabel {
+	return []AddressLabel{AddressHome, AddressWork, AddressOther}
+}

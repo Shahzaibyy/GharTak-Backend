@@ -21,8 +21,11 @@ func TestPresignPurposes(t *testing.T) {
 		wantErr  error
 	}{
 		{purpose: "cnic", prefix: "cnic/", maxBytes: 2 << 20},
+		{purpose: "cnic_front", prefix: "cnic/", maxBytes: 2 << 20},
+		{purpose: "cnic_back", prefix: "cnic/", maxBytes: 2 << 20},
 		{purpose: "selfie", prefix: "selfie/", maxBytes: 2 << 20},
 		{purpose: "vehicle_doc", prefix: "vehicle/", maxBytes: 5 << 20},
+		{purpose: "driving_licence", prefix: "vehicle/", maxBytes: 5 << 20},
 		{purpose: "catalog_photo", prefix: "catalog/", maxBytes: 8 << 20},
 		{purpose: "proof_of_delivery", prefix: "proof/", maxBytes: 8 << 20},
 		{purpose: "other", wantErr: apperror.ErrInvalidInput},

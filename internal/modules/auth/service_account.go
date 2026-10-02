@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/yourusername/ghartak-backend/internal/platform/apperror"
 	"github.com/yourusername/ghartak-backend/internal/platform/money"
+	"github.com/yourusername/ghartak-backend/internal/platform/notify"
 	"github.com/yourusername/ghartak-backend/internal/platform/pii"
 )
 
@@ -97,7 +99,11 @@ func (s *Service) storeLink(ctx context.Context, userID uuid.UUID, sealed sealed
 	if err := s.codes.Save(ctx, pendingPhoneKey(userID), packPhone(sealed), otpTTL); err != nil {
 		return OTPResult{}, err
 	}
-	return s.issueOTP(ctx, RoleCustomer, linkSubject(userID))
+	plain, err := pii.Decrypt(s.piiKey, sealed.ciphertext)
+	if err != nil {
+		return OTPResult{}, err
+	}
+	return s.issueOTP(ctx, RoleCustomer, linkSubject(userID), notify.ChannelWhatsApp, plain)
 }
 
 func (s *Service) PhoneLinkVerify(ctx context.Context, userID uuid.UUID, otp string) error {
@@ -130,6 +136,65 @@ func (s *Service) RequirePhone(ctx context.Context, id uuid.UUID) error {
 	return phoneRequired(verified)
 }
 
+func (s *Service) RequestEmailOTP(ctx context.Context, req EmailOTPRequest) (OTPResult, error) {
+	email, err := normalizeEmail(req.Email)
+	if err != nil {
+		return OTPResult{}, err
+	}
+	if err := s.allowEmail(ctx, req.IP, email); err != nil {
+		return OTPResult{}, err
+	}
+	return s.issueOTP(ctx, RoleCustomer, emailSubject(email), notify.ChannelEmail, email)
+}
+
+func (s *Service) VerifyEmail(ctx context.Context, req EmailVerifyRequest) (Session, error) {
+	email, err := normalizeEmail(req.Email)
+	if err != nil {
+		return Session{}, err
+	}
+	if err := s.checkOTP(ctx, RoleCustomer, emailSubject(email), req.OTP); err != nil {
+		return Session{}, err
+	}
+	account, err := s.emailAccount(ctx, email)
+	if err != nil {
+		return Session{}, err
+	}
+	return s.issueActive(ctx, account)
+}
+
+func (s *Service) emailAccount(ctx context.Context, email string) (Account, error) {
+	account, err := s.accounts.FindByEmail(ctx, email)
+	if errors.Is(err, apperror.ErrNotFound) {
+		return s.accounts.InsertEmail(ctx, email)
+	}
+	return account, err
+}
+
+func (s *Service) SetPreferences(ctx context.Context, id uuid.UUID, types []string) (Profile, error) {
+	row, err := s.accounts.SetPreferences(ctx, id, types)
+	if err != nil {
+		return Profile{}, err
+	}
+	return s.presentProfile(row)
+}
+
+func (s *Service) allowEmail(ctx context.Context, ip, email string) error {
+	if err := s.limits.Allow(ctx, "rl:otp:ip:"+ip, ipLimit, time.Hour); err != nil {
+		return err
+	}
+	return s.limits.Allow(ctx, "rl:otp:email:"+email, phoneLimit, time.Hour)
+}
+
+func normalizeEmail(raw string) (string, error) {
+	email := strings.ToLower(strings.TrimSpace(raw))
+	if len(email) < 5 || len(email) > 320 || !strings.Contains(email, "@") {
+		return "", apperror.Invalid("email is invalid")
+	}
+	return email, nil
+}
+
+func emailSubject(email string) string { return "email:" + email }
+
 func phoneRequired(verified bool) error {
 	if verified {
 		return nil
@@ -149,6 +214,7 @@ func (s *Service) presentProfile(row profileRow) (Profile, error) {
 	return Profile{
 		ID: row.ID, Name: row.Name, Email: row.Email, Phone: phone,
 		PhoneVerified: row.PhoneVerified, WalletBalance: wallet,
+		PreferredOrderTypes: row.PreferredOrderTypes,
 	}, nil
 }
 

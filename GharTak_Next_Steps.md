@@ -2,6 +2,8 @@
 
 Start here after the foundation in this repo. Do one step per change set. Keep `go test ./...` green before moving on. Auth and onboarding completion is Step 14 onward.
 
+Flutter clients wiring these APIs: start at `GharTak_Flutter_Integration_Index.md` (demo seed + auth + catalog/orders + Mapbox).
+
 The product docs stay the source of truth for behavior: `GharTak_PRD.md`, `GharTak_SRS.md`, `GharTak_Technical_Design.md`. `GharTak_Backend_Rules.md` is the engineering constraint. This file is the order of work so later steps extend the schema and types already here.
 
 ## What is already in place

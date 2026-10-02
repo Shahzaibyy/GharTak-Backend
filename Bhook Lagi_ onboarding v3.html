@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bhook Lagi: Gen Z onboarding</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🍽️%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<style>
+:root{--bg:#FAF8F5;--sf:#fff;--pr:#D96B41;--tx:#1C1917;--t2:#78716C;--bd:#EDE7E0;--ok:#2F9E5B;--er:#B8452B;--tint:#F6E7DF;--cr:#FAF8F5;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17140F;--sf:#211D17;--pr:#E37A52;--tx:#F5F1EB;--t2:#A39A8E;--bd:#332C22;--tint:#2E2118}}
+:root[data-theme="dark"]{--bg:#17140F;--sf:#211D17;--pr:#E37A52;--tx:#F5F1EB;--t2:#A39A8E;--bd:#332C22;--tint:#2E2118}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:400 16px/24px "General Sans",Inter,system-ui,sans-serif}
+header{padding:32px 24px 8px;max-width:720px}
+h1{font-size:32px;line-height:40px;font-weight:600;margin:0 0 8px}
+header p,.sub{margin:0;color:var(--t2)}
+h2{font-size:24px;line-height:32px;font-weight:600;margin:36px 24px 4px}
+.sub{margin:0 24px 8px}
+.row{display:flex;gap:24px;overflow-x:auto;padding:8px 24px 24px}
+.s{flex:0 0 288px}
+.cap{font-size:14px;line-height:20px;font-weight:500;margin:0 0 8px}
+.ph{height:580px;background:var(--bg);border:1px solid var(--bd);border-radius:32px;overflow:hidden;display:flex;flex-direction:column;position:relative}
+.sb{display:flex;justify-content:space-between;padding:12px 22px 0;font-size:12px;font-weight:600}
+.bd{flex:1;display:flex;flex-direction:column;padding:28px 22px 22px;gap:14px;min-height:0}
+.sp{flex:1}
+.h{font-size:28px;line-height:34px;font-weight:600;margin:0;letter-spacing:-.01em}
+.p{font-size:15px;line-height:22px;color:var(--t2);margin:0}
+.c{font-size:13px;line-height:18px;color:var(--t2);text-align:center;margin:0}
+.btn{height:52px;border-radius:14px;border:0;background:var(--pr);color:#fff;font:500 16px "General Sans",Inter,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;width:100%}
+.btn.o{background:var(--sf);color:var(--tx);border:1px solid var(--bd)}
+.btn.t{background:none;color:var(--pr);height:32px;font-size:14px}
+.in{height:52px;border:1px solid var(--bd);background:var(--sf);border-radius:14px;display:flex;align-items:center;padding:0 16px;font-size:16px;gap:10px}
+.in.f{border-color:var(--pr)}.in span{color:var(--t2)}
+.lb{font-size:13px;font-weight:500;margin:0 0 6px;color:var(--t2)}
+.ic{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.g{font-weight:700;color:#4285F4;font-size:17px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:600;font-size:18px}
+.logo svg{width:16px;height:32px;color:var(--pr)}
+.otp{display:flex;gap:8px}.ob{flex:1;height:56px;border:1px solid var(--bd);background:var(--sf);border-radius:14px;display:grid;place-items:center;font-size:22px;font-weight:600}.ob.f{border-color:var(--pr)}
+.chips{display:flex;gap:8px}.chip{padding:8px 16px;border-radius:20px;border:1px solid var(--bd);background:var(--sf);font-size:14px}.chip.on{background:var(--tint);border-color:var(--pr);color:var(--pr);font-weight:500}
+.tile{display:flex;gap:14px;align-items:center;padding:16px;border-radius:18px;background:var(--sf);border:1px solid var(--bd)}
+.tile.on{border-color:var(--pr);background:var(--tint)}
+.tile b{font-weight:600;font-size:17px;display:block}.tile span{font-size:13px;line-height:18px;color:var(--t2);display:block}
+.bub{width:44px;height:44px;border-radius:14px;background:var(--tint);color:var(--pr);display:grid;place-items:center;flex:none}
+.tag{font-size:12px;line-height:16px;font-weight:500;padding:3px 9px;border-radius:8px;background:var(--bd);color:var(--t2);margin-left:auto}
+.tag.ok{background:rgba(47,158,91,.14);color:var(--ok)}.tag.rq{background:rgba(184,69,43,.12);color:var(--er)}
+.tl{list-style:none;margin:6px 0 0;padding:0}.tl li{position:relative;padding:0 0 20px 36px}
+.tl li::before{content:"";position:absolute;left:9px;top:22px;bottom:0;width:2px;background:var(--bd)}.tl li:last-child::before{display:none}
+.tl i{position:absolute;left:0;top:0;width:20px;height:20px;border-radius:50%;border:2px solid var(--bd);background:var(--bg);display:grid;place-items:center}
+.tl .d i{background:var(--ok);border-color:var(--ok);color:#fff}.tl .d svg{width:12px;height:12px;stroke-width:3}.tl .n i{border-color:var(--pr);background:var(--tint)}
+.tl b{font-weight:600;display:block}.tl span{font-size:13px;color:var(--t2)}
+/* animated first screen */
+.hero{animation:bgc 16s infinite}
+.hero .logo{animation:ink 16s infinite}
+.stage{position:relative;flex:1}
+.sl{position:absolute;inset:0;display:flex;flex-direction:column;gap:12px;justify-content:center;opacity:0;animation:sl 16s infinite}
+.sl h3{font-size:36px;line-height:40px;font-weight:600;margin:0;letter-spacing:-.02em}
+.sl p{margin:0;font-size:17px;line-height:25px;opacity:.72}
+.sl.r{color:var(--cr)}
+.orb{width:64px;height:64px;border:2px solid currentColor;border-radius:50%;position:relative;color:var(--pr);animation:ring 16s infinite;margin-bottom:8px}
+.orb::after{content:"";position:absolute;width:12px;height:12px;border-radius:50%;background:currentColor;top:-7px;left:50%;margin-left:-6px;transform-origin:6px 37px;animation:spin 3s linear infinite}
+.dots{display:flex;gap:6px;color:var(--pr);animation:ring 16s infinite}
+.dots i{height:6px;width:6px;border-radius:3px;background:currentColor;opacity:.3;animation:dn 16s infinite}
+.hero .btn{animation:bt 16s infinite}
+@keyframes sl{0%{opacity:0;transform:translateY(16px)}3%,22%{opacity:1;transform:none}26%,100%{opacity:0;transform:translateY(-16px)}}
+@keyframes bgc{0%,71%{background:var(--bg)}76%,96%{background:var(--pr)}100%{background:var(--bg)}}
+@keyframes ink{0%,71%{color:var(--tx)}76%,96%{color:#FAF8F5}100%{color:var(--tx)}}
+@keyframes ring{0%,71%{color:var(--pr)}76%,96%{color:#FAF8F5}100%{color:var(--pr)}}
+@keyframes bt{0%,71%{background:var(--pr);color:#fff}76%,96%{background:#FAF8F5;color:#B8452B}100%{background:var(--pr);color:#fff}}
+@keyframes dn{0%,24%{width:22px;opacity:1}27%,100%{width:6px;opacity:.3}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.hero,.hero *,.hero *::after{animation:none!important}.sl{display:none}.sl.a{display:flex;opacity:1}}
+.mk{width:44px;height:44px;flex:none}
+.hero .bd,.hero .sb{position:relative;z-index:1}
+.rings{position:absolute;right:-110px;bottom:70px;width:300px;height:300px;border:2px solid currentColor;border-radius:50%;color:var(--pr);opacity:.22;animation:ring 16s infinite}
+.rings::before,.rings::after{content:"";position:absolute;border:2px solid currentColor;border-radius:50%}
+.rings::before{inset:57px}.rings::after{inset:93px}
+.sl .mk{width:60px;height:60px;margin-bottom:6px}
+.sl h3{font-size:34px;line-height:38px}
+.stk{align-self:flex-start;border:1.5px solid currentColor;border-radius:10px;padding:4px 12px;font-size:13px;font-weight:500;transform:rotate(-3deg);margin-top:8px}
+.tile .mk{width:52px;height:52px}
+.bars{display:flex;gap:6px;padding:12px 22px 0}
+.bars i{position:relative;flex:1;height:4px;border-radius:2px;background:var(--bd);overflow:hidden}
+.bars i::after{content:"";position:absolute;inset:0;background:var(--pr);transform:scaleX(0);transform-origin:left}
+.bars i.d::after{transform:scaleX(1)}.bars i.a::after{animation:fill 2.8s linear forwards}
+.hold .bars i.a::after{animation-play-state:paused}
+@keyframes fill{to{transform:scaleX(1)}}
+.hx{transition:background .4s,color .4s}.hx.inv{background:var(--pr);color:#FAF8F5}
+.hx.inv .logo,.hx.inv .logo svg{color:#FAF8F5}.hx.inv .bars i{background:rgba(255,255,255,.3)}.hx.inv .bars i::after{background:#FAF8F5}
+.hx.inv .btn{background:#FAF8F5;color:#B8452B}.hx.inv .art svg{--ac:#FAF8F5}
+.slides{position:relative;flex:1;margin:0 22px}
+.sx{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;justify-content:center;opacity:0;transform:translateX(24px);transition:opacity .3s,transform .3s;pointer-events:none}
+.sx.on{opacity:1;transform:none}
+.sx h3{font-size:30px;line-height:34px;font-weight:600;margin:0;letter-spacing:-.02em}
+.sx p{margin:0;font-size:16px;line-height:23px;opacity:.75}
+.art{height:130px}.art svg{width:100%;height:100%}.art text{font-family:inherit}
+.zl,.zr{position:absolute;top:70px;bottom:92px;width:50%;z-index:2;touch-action:pan-y}.zl{left:0}.zr{right:0}
+.cta{padding:0 22px 22px;position:relative;z-index:3}
+@media(prefers-reduced-motion:reduce){.bars i.a::after{animation:none;transform:scaleX(1)}.sx{transition:none}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="b" viewBox="26 19 30 62"><path fill="currentColor" fill-rule="evenodd" d="M36.46,20A11.46,11.46 0 0,1 47.92,31.46A11.46,11.46 0 0,1 36.46,42.92A18.54,18.54 0 0,1 55,61.46A18.54,18.54 0 0,1 36.46,80L31.46,80A5,5 0 0,1 26.46,75L26.46,25A5,5 0 0,1 31.46,20ZM36.46,28A3.46,3.46 0 0,0 36.46,34.92L36.46,28ZM36.46,50.92A10.54,10.54 0 0,1 36.46,72L36.46,50.92Z"/></symbol>
+<symbol id="chk" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+<symbol id="bowl" viewBox="0 0 24 24"><path d="M4 12h16a8 8 0 0 1-16 0zM9 8c0-2 2-2 2-4M14 8c0-2 2-2 2-4"/></symbol>
+<symbol id="bag" viewBox="0 0 24 24"><path d="M6 8h12l1 12H5zM9 8a3 3 0 0 1 6 0"/></symbol>
+<symbol id="box" viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"/></symbol>
+<symbol id="moto" viewBox="0 0 24 24"><circle cx="6" cy="16" r="3"/><circle cx="18" cy="16" r="3"/><path d="M6 16l4-7h4l4 7M10 9H8M14 9l-1-3h3"/></symbol>
+<symbol id="up" viewBox="0 0 24 24"><path d="M12 16V5m0 0L8 9m4-4l4 4M5 19h14"/></symbol>
+<symbol id="cm" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="var(--pr)"/><g transform="translate(50,50) scale(.62) translate(-50,-51)"><path fill="#FAF8F5" fill-rule="evenodd" d="M50,88L28.13,54.08A26,26 0 1,1 71.87,54.08ZM66,40A16,16 0 1,0 34,40A16,16 0 1,0 66,40Z"/><circle cx="50" cy="40" r="9.9" fill="#FAF8F5"/></g></symbol><symbol id="rm" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46.5" fill="#1C1917" stroke="var(--pr)" stroke-width="3"/><g transform="translate(3,0)"><path fill="var(--pr)" d="M76,50L42,38.95V61.05Z"/><rect x="18" y="39.5" width="18" height="5" rx="2.5" fill="#FAF8F5"/><rect x="25" y="55.5" width="11" height="5" rx="2.5" fill="#FAF8F5"/></g></symbol></defs></svg>
+
+<header>
+<h1>Bhook Lagi: Gen Z onboarding</h1>
+<p>Minimal screens in Roman Urdu. The first screen animates on its own and loops.</p>
+</header>
+
+<h2>Pehli screen</h2>
+<p class="sub">Ek hi Get started button, phir banda chuntaa hai ke kya karna hai.</p>
+<div class="row">
+
+<div class="s"><p class="cap">Welcome: tap, swipe or wait</p><div class="ph hx" id="hx"><div class="sb"><span>9:41</span><span>5G</span></div>
+<div class="bars" id="bars"><i class="a"></i><i></i><i></i><i></i></div>
+<div class="logo" style="padding:14px 22px 0"><svg><use href="#b"/></svg>Bhook Lagi</div>
+<div class="slides" id="slides"><section class="sx on"><div class="art"><svg viewBox="0 0 200 150"><ellipse cx="100" cy="140" rx="60" ry="5" fill="var(--bd)"/><rect x="64" y="12" width="72" height="124" rx="12" fill="var(--sf)" stroke="var(--tx)" stroke-width="3"/><path d="M64 70h72" stroke="var(--tx)" stroke-width="3"/><rect x="124" y="30" width="5" height="22" rx="2.5" fill="var(--tx)"/><rect x="124" y="84" width="5" height="22" rx="2.5" fill="var(--tx)"/><circle cx="87" cy="38" r="4" fill="var(--tx)"/><circle cx="108" cy="38" r="4" fill="var(--tx)"/><path d="M86 56q11-9 22 0M80 32l12-4M115 28l12 4" fill="none" stroke="var(--tx)" stroke-width="3" stroke-linecap="round"/><ellipse cx="96" cy="121" rx="8" ry="6" fill="var(--pr)"/><circle cx="94" cy="119" r="2" fill="#FAF8F5"/><path d="M146 40q10 8 0 18t8 16" fill="none" stroke="var(--t2)" stroke-width="2" stroke-dasharray="3 4"/><circle cx="154" cy="78" r="3" fill="var(--tx)"/></svg></div><h3>Fridge khola? Khaali. Order karo.</h3><p>Fateh Jang ke desi khaane, seedha ghar.</p><span class="stk">Mummy ko mat batana</span></section><section class="sx"><div class="art"><svg viewBox="0 0 200 150"><ellipse cx="100" cy="140" rx="70" ry="5" fill="var(--bd)"/><circle cx="96" cy="96" r="42" fill="var(--sf)" stroke="var(--tx)" stroke-width="3"/><circle cx="96" cy="96" r="30" fill="none" stroke="var(--bd)" stroke-width="3"/><path d="M62 98a34 28 0 0 1 68 0z" fill="var(--pr)"/><g fill="#FAF8F5"><circle cx="80" cy="90" r="2.5"/><circle cx="98" cy="84" r="2.5"/><circle cx="112" cy="92" r="2.5"/></g><path d="M84 62q-6-8 0-14t0-12M98 60q-6-8 0-14t0-12M112 62q-6-8 0-14t0-12" fill="none" stroke="var(--t2)" stroke-width="2.5" stroke-linecap="round"/><g transform="translate(150 22)"><rect width="42" height="40" rx="7" fill="var(--sf)" stroke="var(--tx)" stroke-width="3"/><path d="M0 12h42" stroke="var(--tx)" stroke-width="3"/><rect width="42" height="12" rx="7" fill="var(--pr)"/><text x="21" y="32" text-anchor="middle" font-size="13" font-weight="700" fill="var(--tx)">KAL</text></g><g transform="translate(138 128) rotate(-8)" stroke="var(--tx)" stroke-width="3" stroke-linecap="round"><path d="M0 0h34"/><rect x="-6" y="-8" width="7" height="16" rx="2" fill="var(--tx)"/><rect x="33" y="-8" width="7" height="16" rx="2" fill="var(--tx)"/></g></svg></div><h3>Diet kal se. Order aaj se.</h3><p>Grocery bhi, gaon tak bhi. Kuch bhi, kahin bhi.</p><span class="stk">Diet? Kaun si diet</span></section><section class="sx"><div class="art"><svg viewBox="0 0 200 150"><path d="M16 128h168" stroke="var(--tx)" stroke-width="3" stroke-linecap="round"/><path d="M42 60q0-12 12-12h20q12 0 12 12" fill="none" stroke="var(--tx)" stroke-width="4"/><rect x="26" y="58" width="88" height="22" rx="9" fill="#B9552F" stroke="var(--tx)" stroke-width="3"/><rect x="30" y="80" width="80" height="48" rx="9" fill="var(--pr)" stroke="var(--tx)" stroke-width="3"/><rect x="62" y="68" width="16" height="12" rx="3" fill="#FAF8F5" stroke="var(--tx)" stroke-width="2"/><circle cx="54" cy="100" r="5" fill="#FAF8F5"/><circle cx="86" cy="100" r="5" fill="#FAF8F5"/><circle cx="55" cy="101" r="2" fill="var(--tx)"/><circle cx="87" cy="101" r="2" fill="var(--tx)"/><path d="M60 117q10-6 20 0" fill="none" stroke="#FAF8F5" stroke-width="3" stroke-linecap="round"/><path d="M102 48l-6 16 20-16z" fill="var(--sf)" stroke="var(--tx)" stroke-width="3" stroke-linejoin="round"/><rect x="88" y="6" width="104" height="44" rx="14" fill="var(--sf)" stroke="var(--tx)" stroke-width="3"/><text x="140" y="26" text-anchor="middle" font-size="12" font-weight="600" fill="var(--tx)">Oye, mujhe</text><text x="140" y="41" text-anchor="middle" font-size="12" font-weight="600" fill="var(--tx)">bhool gaye?</text></svg></div><h3>Lunch ghar bhool aaye?</h3><p>File, document, jo bhi. Dasti book karo, hum utha laate hain.</p><span class="stk">Sab ke saath hota hai</span></section><section class="sx"><div class="art"><svg viewBox="0 0 200 150"><path d="M10 96h28M4 110h24M14 124h20" stroke="var(--tx)" stroke-width="3" stroke-linecap="round" opacity=".4"/><circle cx="64" cy="116" r="17" fill="none" stroke="var(--tx)" stroke-width="5"/><circle cx="146" cy="116" r="17" fill="none" stroke="var(--tx)" stroke-width="5"/><circle cx="64" cy="116" r="4" fill="var(--tx)"/><circle cx="146" cy="116" r="4" fill="var(--tx)"/><path d="M64 116l22-30h26l34 30M112 86l-8-18h-10" fill="none" stroke="var(--tx)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><rect x="30" y="62" width="46" height="36" rx="7" fill="var(--ac,var(--pr))" stroke="var(--tx)" stroke-width="3"/><path d="M30 76h46" stroke="var(--tx)" stroke-width="3"/><circle cx="104" cy="44" r="11" fill="var(--sf)" stroke="var(--tx)" stroke-width="3"/><path d="M93 44a11 11 0 0 1 22 0z" fill="var(--tx)"/><path d="M104 56l-10 22 22 8" fill="none" stroke="var(--tx)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><g fill="#C9A063" stroke="var(--tx)" stroke-width="2.5"><circle cx="168" cy="30" r="9"/><circle cx="150" cy="14" r="6"/><circle cx="184" cy="58" r="6"/></g></svg></div><h3>Bike hai? Boss khud ban.</h3><p>Order uthao, paisay kamao. Apna time, apni marzi.</p><span class="stk">Boss bhi tum</span></section></div>
+<div class="zl" id="zl"></div><div class="zr" id="zr"></div>
+<div class="cta"><button class="btn">Get started</button></div></div></div>
+
+<div class="s"><p class="cap">Aap kya karna chahte ho?</p><div class="ph"><div class="sb"><span>9:41</span><span>5G</span></div><div class="bd">
+<h3 class="h">Chalo shuru karte hain</h3>
+<p class="p">Ek choose karo. Baad mein dono bhi kar sakte ho.</p>
+<div class="sp"></div>
+<div class="tile on"><svg class="mk"><use href="#cm"/></svg><div><b>Mujhe kuch mangwana hai</b><span>Khaana, grocery ya dasti</span></div></div>
+<div class="tile"><svg class="mk"><use href="#rm"/></svg><div><b>Mujhe kamana hai</b><span>Rider ban ke paisay kamao</span></div></div>
+<div class="sp"></div>
+<button class="btn">Continue</button>
+</div></div></div>
+
+</div>
+
+<h2>Customer</h2>
+<p class="sub">Number, code, naam aur jagah. Bas.</p>
+<div class="row">
+
+<div class="s"><p class="cap">Number batao</p><div class="ph"><div class="sb"><span>9:41</span><span>5G</span></div><div class="bd"><svg class="mk"><use href="#cm"/></svg>
+<h3 class="h">Number batao</h3>
+<p class="p">We'll send a 6-digit code on WhatsApp.</p>
+<div><p class="lb">Mobile number</p><div class="in f"><b>+92</b><span>|</span>300 1234567</div></div>
+<div class="sp"></div>
+<button class="btn">Send code</button>
+<button class="btn o"><span class="g">G</span>Continue with Google</button>
+<button class="btn t">Sign up with email</button>
+</div></div></div>
+
+<div class="s"><p class="cap">Code daalo</p><div class="ph"><div class="sb"><span>9:41</span><span>5G</span></div><div class="bd"><svg class="mk"><use href="#cm"/></svg>
+<h3 class="h">WhatsApp check karo</h3>
+<p class="p">Enter the 6-digit code sent to +92 300 1234567.</p>
+<div class="otp"><div class="ob">4</div><div class="ob">8</div><div class="ob">2</div><div class="ob">9</div><div class="ob f">|</div><div class="ob"></div></div>
+<p class="p">Resend code in 0:42</p>
+<div class="sp"></div>
+<button class="btn">Verify</button>
+<button class="btn t">Send via SMS instead</button>
+</div></div></div>
+
+<div class="s"><p class="cap">Naam aur jagah</p><div class="ph"><div class="sb"><span>9:41</span><span>5G</span></div><div class="bd"><svg class="mk"><use href="#cm"/></svg>
+<h3 class="h">Aap ka naam?</h3>
+<p class="lb">Full name</p><div class="in f">Ayesha</div>
+<p class="lb" style="margin-top:8px">Delivery address</p>
+<div class="in">Attock Road, Fateh Jang</div>
+<div class="chips"><span class="chip on">Home</span><span class="chip">Work</span><span class="chip">Other</span></div>
+<div class="sp"></div>
+<button class="btn">Save and continue</button>
+</div></div></div>
+
+<div class="s"><p class="cap">Kya mangwana hai?</p><div class="ph"><div class="sb"><span>9:41</span><span>5G</span></div><div class="bd"><svg class="mk"><use href="#cm"/></svg>
+<h3 class="h">Ayesha, kya mangwana hai?</h3>
+<div class="tile"><div class="bub"><svg class="ic"><use href="#bowl"/></svg></div><div><b>Khaana</b><span>Fateh Jang ke desi khaane</span></div></div>
+<div class="tile"><div class="bub"><svg class="ic"><use href="#bag"/></svg></div><div><b>Grocery</b><span>Ghar ka saman, gaon tak</span></div></div>
+<div class="tile"><div class="bub"><svg class="ic"><use href="#box"/></svg></div><div><b>Dasti</b><span>Lunch, file, document. Jo ghar reh gaya, hum le aate hain</span></div></div>
+<div class="sp"></div>
+</div></div></div>
+
+</div>
+
+<h2>Rider</h2>
+<p class="sub">Phone se shuru, documents, phir check aur training.</p>
+<div class="row">
+
+<div class="s"><p class="cap">Rider banna hai?</p><div class="ph"><div class="sb"><span>9:41</span><span>5G</span></div><div class="bd"><svg class="mk"><use href="#rm"/></svg>
+<h3 class="h">Apni bike, apna time</h3>
+<p class="p">Enter your mobile number and city. We'll send a code on WhatsApp.</p>
+<div><p class="lb">Mobile number</p><div class="in f"><b>+92</b><span>|</span>312 7654321</div></div>
+<div><p class="lb">City</p><div class="in">Fateh Jang<span style="margin-left:auto">▾</span></div></div>
+<div class="sp"></div>
+<button class="btn">Apply now</button>
+<p class="c">Already a rider? <b style="color:var(--pr);font-weight:500">Log in</b></p>
+</div></div></div>
+
+<div class="s"><p class="cap">Apni details</p><div class="ph"><div class="sb"><span>9:41</span><span>5G</span></div><div class="bd"><svg class="mk"><use href="#rm"/></svg>
+<h3 class="h">Apni details</h3>
+<p class="lb">Full name</p><div class="in f">Usman Ali</div>
+<p class="lb">CNIC number</p><div class="in"><span>00000-0000000-0</span></div>
+<div class="chips"><span class="chip on">Motorcycle</span><span class="chip">Bicycle</span></div>
+<div class="in"><span>Number plate (e.g. ATK 1234)</span></div>
+<div class="in"><span>Licence number</span></div>
+<div class="sp"></div>
+<button class="btn">Continue</button>
+</div></div></div>
+
+<div class="s"><p class="cap">Documents</p><div class="ph"><div class="sb"><span>9:41</span><span>5G</span></div><div class="bd" style="gap:10px"><svg class="mk"><use href="#rm"/></svg>
+<h3 class="h">Documents bhejo</h3>
+<p class="p">Your documents are used only for verification.</p>
+<div class="tile"><div class="bub" style="background:rgba(47,158,91,.14);color:var(--ok)"><svg class="ic"><use href="#chk"/></svg></div><b style="font-size:15px">CNIC (front)</b><span class="tag ok">Uploaded</span></div>
+<div class="tile"><div class="bub"><svg class="ic"><use href="#up"/></svg></div><b style="font-size:15px">CNIC (back)</b><span class="tag rq">Required</span></div>
+<div class="tile"><div class="bub"><svg class="ic"><use href="#up"/></svg></div><b style="font-size:15px">Driving licence</b><span class="tag rq">Required</span></div>
+<div class="tile"><div class="bub"><svg class="ic"><use href="#up"/></svg></div><b style="font-size:15px">Selfie</b><span class="tag rq">Required</span></div>
+<div class="sp"></div>
+<button class="btn">Submit application</button>
+</div></div></div>
+
+<div class="s"><p class="cap">Check aur training</p><div class="ph"><div class="sb"><span>9:41</span><span>5G</span></div><div class="bd"><svg class="mk"><use href="#rm"/></svg>
+<h3 class="h">Hum check kar rahe hain</h3>
+<p class="p">24 se 48 ghante lagte hain.</p>
+<ul class="tl">
+<li class="d"><i><svg class="ic"><use href="#chk"/></svg></i><b>Application received</b><span>Documents received</span></li>
+<li class="n"><i></i><b>Document check</b><span>In progress</span></li>
+<li><i></i><b>Orientation</b><span>Short training, online or in person</span></li>
+<li><i></i><b>Go online</b><span>Start receiving orders</span></li>
+</ul>
+<div class="sp"></div>
+<button class="btn">Book orientation</button>
+<button class="btn t">Contact support</button>
+</div></div></div>
+
+</div>
+<div style="height:24px"></div>
+<script>
+(function(){var hx=document.getElementById('hx'),sx=[].slice.call(hx.querySelectorAll('.sx')),bars=[].slice.call(hx.querySelectorAll('.bars i')),n=sx.length,i=0,held=false,ht,x0=0;
+function go(k){i=(k+n)%n;sx.forEach(function(e,j){e.classList.toggle('on',j===i)});bars.forEach(function(b,j){b.className=j<i?'d':'';});void hx.offsetWidth;bars[i].className='a';hx.classList.toggle('inv',i===n-1)}
+bars.forEach(function(b){b.addEventListener('animationend',function(){if(b.className==='a')go(i+1)})});
+[['zl',-1],['zr',1]].forEach(function(z){var el=document.getElementById(z[0]);
+el.addEventListener('pointerdown',function(e){x0=e.clientX;held=false;ht=setTimeout(function(){held=true;hx.classList.add('hold')},250)});
+function up(e){clearTimeout(ht);hx.classList.remove('hold');if(held)return;var dx=e.clientX-x0;if(Math.abs(dx)>40)go(i+(dx<0?1:-1));else go(i+z[1])}
+el.addEventListener('pointerup',up);
+['pointercancel','pointerleave'].forEach(function(t){el.addEventListener(t,function(){clearTimeout(ht);hx.classList.remove('hold')})})});
+document.addEventListener('keydown',function(e){if(e.key==='ArrowRight')go(i+1);if(e.key==='ArrowLeft')go(i-1)});
+})();
+</script>
+</body>
+</html>

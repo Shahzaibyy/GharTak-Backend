@@ -45,7 +45,7 @@ FROM users
 WHERE firebase_uid = $1 AND deleted_at IS NULL`
 
 const profileSQL = `
-SELECT id, name, email, phone_ciphertext, phone_verified, wallet_balance::text
+SELECT id, name, email, phone_ciphertext, phone_verified, wallet_balance::text, preferred_order_types
 FROM users
 WHERE id = $1 AND deleted_at IS NULL`
 
@@ -53,7 +53,30 @@ const updateNameSQL = `
 UPDATE users
 SET name = $2, updated_at = now()
 WHERE id = $1 AND deleted_at IS NULL
-RETURNING id, name, email, phone_ciphertext, phone_verified, wallet_balance::text`
+RETURNING id, name, email, phone_ciphertext, phone_verified, wallet_balance::text, preferred_order_types`
+
+const setPreferencesSQL = `
+UPDATE users
+SET preferred_order_types = $2, updated_at = now()
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING id, name, email, phone_ciphertext, phone_verified, wallet_balance::text, preferred_order_types`
+
+const findEmailSQL = `
+SELECT id, status
+FROM users
+WHERE lower(email) = $1 AND deleted_at IS NULL`
+
+const insertEmailSQL = `
+WITH inserted AS (
+    INSERT INTO users (email, phone_verified)
+    VALUES ($1, false)
+    ON CONFLICT DO NOTHING
+    RETURNING id, status
+)
+SELECT id, status FROM inserted
+UNION ALL
+SELECT id, status FROM users
+WHERE lower(email) = $1 AND deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM inserted)`
 
 const attachPhoneSQL = `
 UPDATE users
@@ -149,6 +172,34 @@ func (r *Repository) FindByFirebase(ctx context.Context, uid string) (Account, e
 	return account, nil
 }
 
+func (r *Repository) FindByEmail(ctx context.Context, email string) (Account, error) {
+	ctx, cancel := database.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	var account Account
+	err := r.pool.QueryRow(ctx, findEmailSQL, email).Scan(&account.ID, &account.Status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Account{}, apperror.ErrNotFound
+	}
+	if err != nil {
+		return Account{}, fmt.Errorf("auth: find email user: %w", err)
+	}
+	return account, nil
+}
+
+func (r *Repository) InsertEmail(ctx context.Context, email string) (Account, error) {
+	ctx, cancel := database.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	var account Account
+	err := r.pool.QueryRow(ctx, insertEmailSQL, email).Scan(&account.ID, &account.Status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Account{}, apperror.ErrConflict
+	}
+	if err != nil {
+		return Account{}, fmt.Errorf("auth: insert email user: %w", err)
+	}
+	return account, nil
+}
+
 func (r *Repository) InsertGoogle(ctx context.Context, row googleInsert) (Account, error) {
 	ctx, cancel := database.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
@@ -169,6 +220,10 @@ func (r *Repository) Profile(ctx context.Context, id uuid.UUID) (profileRow, err
 
 func (r *Repository) UpdateName(ctx context.Context, id uuid.UUID, name string) (profileRow, error) {
 	return r.oneProfile(ctx, updateNameSQL, id, name)
+}
+
+func (r *Repository) SetPreferences(ctx context.Context, id uuid.UUID, types []string) (profileRow, error) {
+	return r.oneProfile(ctx, setPreferencesSQL, id, types)
 }
 
 func (r *Repository) oneProfile(ctx context.Context, query string, args ...any) (profileRow, error) {
@@ -271,7 +326,10 @@ func scrubUser(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
 
 func scanProfile(row pgx.Row) (profileRow, error) {
 	var found profileRow
-	err := row.Scan(&found.ID, &found.Name, &found.Email, &found.PhoneCipher, &found.PhoneVerified, &found.Wallet)
+	err := row.Scan(
+		&found.ID, &found.Name, &found.Email, &found.PhoneCipher, &found.PhoneVerified, &found.Wallet,
+		&found.PreferredOrderTypes,
+	)
 	if err != nil {
 		return profileRow{}, err
 	}

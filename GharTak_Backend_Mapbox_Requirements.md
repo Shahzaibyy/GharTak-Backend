@@ -1,6 +1,7 @@
 # GharTak — Backend Requirements for Mapbox (Go / chi / Render)
 
-**Companion to:** `GharTak_Flutter_Mapbox_Guide.md`
+**Companion to:** `GharTak_Flutter_Mapbox_Guide.md` (Flutter Maps SDK + which calls hit this API).  
+**Flutter set:** start at `GharTak_Flutter_Integration_Index.md`.
 **Follows:** `GharTak_Backend_Rules.md` (chi, handler → service → repository, guard clauses, ≤ 4 branches per function, context timeouts, Redis TTL on every key, money as paisa, no `float64` for money).
 **Verified against:** Mapbox API docs (rate limits, Geocoding v6 params). Endpoint shapes below are **proposals** fitted to your `GharTak_Next_Steps.md` conventions (`{"data":...}`, `snake_case`, errors via `httpx.WriteError`). Not compiled.
 
