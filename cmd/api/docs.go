@@ -11,8 +11,18 @@ import (
 //go:embed openapi.yaml
 var openAPISpec []byte
 
+//go:embed demo.html
+var demoPortalHTML []byte
+
 func mountDocs(r chi.Router) {
 	r.Mount("/docs", docsHandler())
+	r.Get("/demo", func(w http.ResponseWriter, req *http.Request) {
+		http.Redirect(w, req, "/demo/", http.StatusFound)
+	})
+	r.Get("/demo/", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write(demoPortalHTML)
+	})
 }
 
 func docsHandler() http.Handler {

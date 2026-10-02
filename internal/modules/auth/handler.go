@@ -26,6 +26,8 @@ type authenticator interface {
 	DeleteMe(ctx context.Context, id uuid.UUID) error
 	PhoneLink(ctx context.Context, id uuid.UUID, phone, ip string) (OTPResult, error)
 	PhoneLinkVerify(ctx context.Context, id uuid.UUID, otp string) error
+	DemoLogin(ctx context.Context, phone string, role Role) (Session, error)
+	ListDemoAccounts() ([]DemoAccount, error)
 }
 
 type Handler struct {
@@ -127,6 +129,30 @@ func (h *Handler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteData(w, http.StatusOK, session)
 }
 
+func (h *Handler) DemoAccounts(w http.ResponseWriter, r *http.Request) {
+	list, err := h.auth.ListDemoAccounts()
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteData(w, http.StatusOK, list)
+}
+
+func (h *Handler) DemoLogin(w http.ResponseWriter, r *http.Request) {
+	phone, role, err := decodeDemoLogin(r)
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	session, err := h.auth.DemoLogin(r.Context(), phone, role)
+	if err != nil {
+		h.log.Error().Err(err).Str("role", string(role)).Msg("demo login")
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteData(w, http.StatusOK, session)
+}
+
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	var body refreshBody
 	if err := httpx.Decode(r, &body); err != nil {
@@ -187,6 +213,26 @@ func decodeEmailVerify(r *http.Request) (string, string, error) {
 		return "", "", apperror.Invalid("otp is invalid")
 	}
 	return body.Email, body.OTP, nil
+}
+
+type demoLoginBody struct {
+	Phone string `json:"phone"`
+	Role  string `json:"role"`
+}
+
+func decodeDemoLogin(r *http.Request) (string, Role, error) {
+	var body demoLoginBody
+	if err := httpx.Decode(r, &body); err != nil {
+		return "", "", err
+	}
+	role, err := requiredRole(body.Role)
+	if err != nil {
+		return "", "", err
+	}
+	if body.Phone == "" {
+		return "", "", apperror.Invalid("phone is required")
+	}
+	return body.Phone, role, nil
 }
 
 func requiredRole(raw string) (Role, error) {

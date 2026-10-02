@@ -210,6 +210,8 @@ func publicRoutes(r chi.Router, m modules) {
 	r.Post("/auth/refresh", m.auth.Refresh)
 	r.Post("/auth/google", m.auth.Google)
 	r.Post("/auth/logout", m.auth.Logout)
+	r.Get("/auth/demo/accounts", m.auth.DemoAccounts)
+	r.Post("/auth/demo/login", m.auth.DemoLogin)
 	r.Post("/merchants/register", m.merchants.Register)
 	r.Get("/merchants", m.merchants.List)
 	r.Get("/merchants/{id}/catalog", m.merchants.Catalog)

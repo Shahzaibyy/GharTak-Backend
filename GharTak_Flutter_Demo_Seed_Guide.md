@@ -48,15 +48,35 @@ Zone id for Flutter: `11111111-1111-4111-8111-111111111104`.
 
 ---
 
-## 2. OTP “bypass” — use `dev_otp`, do not skip auth
+## 2. Demo login portal (no OTP)
 
-Skipping auth entirely would fight middleware and create fake showcase bugs. In development the backend **already bypasses SMS**:
+Skip the OTP screens while testing. With `APP_ENV=development`:
+
+1. Open **`https://YOUR-API/demo/`** in a browser  
+2. Tap a seeded customer / rider / merchant / admin  
+3. Access token is copied — paste into Flutter secure storage or Swagger **Authorize**
+
+APIs (same thing for the app):
+
+```http
+GET  /auth/demo/accounts
+POST /auth/demo/login
+{ "phone": "03001111001", "role": "customer" }
+```
+
+Returns a normal session (`access_token`, `refresh_token`, …). **404 outside development.**
+
+Flutter demo flavor can call `/auth/demo/login` instead of OTP request/verify.
+
+### Still available: OTP with `dev_otp`
+
+If you prefer the real OTP screens in the app, request OTP and use `dev_otp` from the response (no SMS):
 
 ```http
 POST /auth/otp/request
 Content-Type: application/json
 
-{ "phone": "03001234567", "role": "customer" }
+{ "phone": "03001111001", "role": "customer" }
 ```
 
 ```json
@@ -67,23 +87,23 @@ Content-Type: application/json
 POST /auth/otp/verify
 Content-Type: application/json
 
-{ "phone": "03001234567", "role": "customer", "otp": "482913" }
+{ "phone": "03001111001", "role": "customer", "otp": "482913" }
 ```
 
-Store `access_token` + `refresh_token`. Customer accounts are created on first verify with `phone_verified: true`, so **checkout is unblocked** without Google or phone-link.
+Store `access_token` + `refresh_token`.
 
 ### Flutter demo mode (recommended)
 
+Prefer one-tap demo login (no OTP):
+
 ```dart
-// Pseudocode — map to your existing env/flavor rules
 if (Env.isDemo) {
-  final req = await authApi.requestOtp(phone: demoPhone, role: 'customer');
-  final otp = req.devOtp; // only present when API APP_ENV=development
-  await authApi.verifyOtp(phone: demoPhone, role: 'customer', otp: otp!);
+  final session = await authApi.demoLogin(phone: '03001111001', role: 'customer');
+  await tokenStore.save(session);
 }
 ```
 
-Optional UX: auto-fill the OTP field from `dev_otp` and hide the “resend SMS” copy in demo flavor. Keep the same screens you will use in production so the demo matches the real flow.
+Or keep OTP screens and auto-fill `dev_otp` from `/auth/otp/request` in development.
 
 ### Roles for showcase
 

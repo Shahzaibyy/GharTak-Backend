@@ -27,6 +27,8 @@ features/auth/
 
 | Method | Path | Auth | Demo ready? |
 |---|---|---|---|
+| `GET` | `/auth/demo/accounts` | No | **Dev only** — list seeded one-tap accounts |
+| `POST` | `/auth/demo/login` | No | **Dev only** — session without OTP (`{ "phone", "role" }`) |
 | `POST` | `/auth/otp/request` | No | Yes — optional `channel` `whatsapp`\|`sms`; returns `dev_otp` in development |
 | `POST` | `/auth/otp/verify` | No | Yes |
 | `POST` | `/auth/email/request` | No | Yes — passwordless email OTP (`dev_otp` in development) |
@@ -39,6 +41,8 @@ features/auth/
 | `GET` | `/users/me` | Bearer customer | Yes |
 | `PATCH` | `/users/me` | Bearer customer | Yes |
 | `DELETE` | `/users/me` | Bearer customer | Yes (wallet must be `0.00`) |
+
+Browser UI (same APIs): **`/demo/`** — tap a seeded user, copy `access_token`. 404 outside `APP_ENV=development`.
 
 ### Request OTP
 

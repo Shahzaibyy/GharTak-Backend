@@ -205,6 +205,42 @@ paths:
                 $ref: "#/components/schemas/SessionResponse"
         "401":
           $ref: "#/components/responses/Error"
+  /auth/demo/accounts:
+    get:
+      tags: [Auth]
+      summary: List demo accounts (development only)
+      description: Returns seeded Fateh Jang / Attock phones for one-tap login. 404 when APP_ENV is not development.
+      responses:
+        "200":
+          description: Demo accounts
+        "404":
+          $ref: "#/components/responses/Error"
+  /auth/demo/login:
+    post:
+      tags: [Auth]
+      summary: Login without OTP (development only)
+      description: Issues a normal session for a seeded phone+role. Use the HTML portal at /demo/ or call from Flutter demo flavor. 404 outside development.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, role]
+              properties:
+                phone: {type: string, example: "03001111001"}
+                role: {$ref: "#/components/schemas/Role"}
+      responses:
+        "200":
+          description: Session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /auth/logout:
     post:
       tags: [Auth]

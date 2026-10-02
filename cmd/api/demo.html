@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GharTak demo login</title>
+<style>
+  :root { --bg:#FAF8F5; --sf:#fff; --pr:#D96B41; --tx:#1C1917; --t2:#78716C; --bd:#EDE7E0; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:400 15px/1.45 system-ui,sans-serif; background:var(--bg); color:var(--tx); }
+  main { max-width:720px; margin:0 auto; padding:28px 20px 48px; }
+  h1 { font-size:28px; margin:0 0 6px; }
+  p { color:var(--t2); margin:0 0 20px; }
+  .grid { display:grid; gap:10px; }
+  button.acc {
+    text-align:left; border:1px solid var(--bd); background:var(--sf);
+    border-radius:14px; padding:14px 16px; cursor:pointer; width:100%;
+  }
+  button.acc:hover { border-color:var(--pr); }
+  button.acc b { display:block; font-size:16px; }
+  button.acc span { color:var(--t2); font-size:13px; }
+  .panel {
+    margin-top:20px; padding:16px; border-radius:14px; background:var(--sf);
+    border:1px solid var(--bd); display:none; white-space:pre-wrap; word-break:break-all;
+    font-family:ui-monospace,monospace; font-size:12px;
+  }
+  .err { color:#B8452B; margin-top:12px; }
+  .ok { color:#2F9E5B; margin-top:12px; }
+  .hint { font-size:13px; color:var(--t2); margin-top:16px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Demo login</h1>
+  <p>Development only. Tap a seeded user — no OTP. Copy the access token into Flutter / Swagger Authorize.</p>
+  <div class="grid" id="list"></div>
+  <div class="ok" id="status"></div>
+  <div class="err" id="error"></div>
+  <pre class="panel" id="out"></pre>
+  <p class="hint">API: <code>GET /auth/demo/accounts</code> · <code>POST /auth/demo/login</code> · Requires <code>APP_ENV=development</code></p>
+</main>
+<script>
+const list = document.getElementById('list');
+const out = document.getElementById('out');
+const status = document.getElementById('status');
+const error = document.getElementById('error');
+
+async function load() {
+  error.textContent = '';
+  const res = await fetch('/auth/demo/accounts');
+  const body = await res.json();
+  if (!res.ok) {
+    error.textContent = (body.error && body.error.message) || 'Demo portal unavailable (set APP_ENV=development)';
+    return;
+  }
+  (body.data || []).forEach(acc => {
+    const btn = document.createElement('button');
+    btn.className = 'acc';
+    btn.innerHTML = '<b>' + acc.label + '</b><span>' + acc.phone + ' · ' + acc.role + (acc.note ? ' · ' + acc.note : '') + '</span>';
+    btn.onclick = () => login(acc);
+    list.appendChild(btn);
+  });
+}
+
+async function login(acc) {
+  status.textContent = 'Signing in as ' + acc.label + '…';
+  error.textContent = '';
+  out.style.display = 'none';
+  const res = await fetch('/auth/demo/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone: acc.phone, role: acc.role })
+  });
+  const body = await res.json();
+  if (!res.ok) {
+    status.textContent = '';
+    error.textContent = (body.error && body.error.message) || 'Login failed';
+    return;
+  }
+  const session = body.data;
+  status.textContent = 'Logged in as ' + acc.label + ' (' + session.role + ')';
+  out.style.display = 'block';
+  out.textContent = JSON.stringify(session, null, 2);
+  try {
+    await navigator.clipboard.writeText(session.access_token);
+    status.textContent += ' — access_token copied to clipboard';
+  } catch (_) {}
+}
+
+load();
+</script>
+</body>
+</html>
