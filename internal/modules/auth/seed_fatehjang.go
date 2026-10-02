@@ -14,14 +14,14 @@ import (
 
 const ensureDemoCustomerSQL = `
 INSERT INTO users (id, phone_ciphertext, phone_lookup, name, phone_verified, preferred_order_types)
-VALUES ($1, $2, $3, $4, true, $5)
+VALUES ($1::uuid, $2::text, $3::text, $4::text, true, $5::text[])
 ON CONFLICT (phone_lookup) WHERE phone_lookup IS NOT NULL DO NOTHING`
 
 const ensureDemoAddressSQL = `
 INSERT INTO addresses (user_id, label, lat, lng, address_text)
-SELECT $1, $2, $3, $4, $5
+SELECT $1::uuid, $2::text, $3::float8, $4::float8, $5::text
 WHERE NOT EXISTS (
-    SELECT 1 FROM addresses WHERE user_id = $1 AND label = $2
+    SELECT 1 FROM addresses WHERE user_id = $1::uuid AND label = $2::text
 )`
 
 // SeedFatehJangCustomers creates demo customers with home pins in Fateh Jang (development).
