@@ -90,6 +90,21 @@ func (h *Handler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteData(w, http.StatusOK, profile)
 }
 
+func (h *Handler) Preferences(w http.ResponseWriter, r *http.Request) {
+	id, types, err := decodePreferences(r)
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	profile, err := h.auth.SetPreferences(r.Context(), id, types)
+	if err != nil {
+		h.log.Error().Err(err).Str("account_id", id.String()).Msg("preferences")
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteData(w, http.StatusOK, profile)
+}
+
 func (h *Handler) DeleteMe(w http.ResponseWriter, r *http.Request) {
 	id, err := AccountID(r.Context())
 	if err != nil {
@@ -163,6 +178,48 @@ func readName(r *http.Request) (string, error) {
 		return "", apperror.Invalid("name is invalid")
 	}
 	return name, nil
+}
+
+type preferencesBody struct {
+	PreferredOrderTypes []string `json:"preferred_order_types"`
+}
+
+func decodePreferences(r *http.Request) (uuid.UUID, []string, error) {
+	id, err := AccountID(r.Context())
+	if err != nil {
+		return uuid.UUID{}, nil, err
+	}
+	var body preferencesBody
+	if err := httpx.Decode(r, &body); err != nil {
+		return uuid.UUID{}, nil, err
+	}
+	types, err := validPreferences(body.PreferredOrderTypes)
+	return id, types, err
+}
+
+func validPreferences(raw []string) ([]string, error) {
+	if len(raw) == 0 || len(raw) > 3 {
+		return nil, apperror.Invalid("preferred_order_types is invalid")
+	}
+	out := make([]string, 0, len(raw))
+	seen := map[string]struct{}{}
+	for _, item := range raw {
+		if _, ok := preferenceTypes[item]; !ok {
+			return nil, apperror.Invalid("preferred_order_types is invalid")
+		}
+		if _, dup := seen[item]; dup {
+			continue
+		}
+		seen[item] = struct{}{}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+var preferenceTypes = map[string]struct{}{
+	"food":    {},
+	"mart":    {},
+	"courier": {},
 }
 
 func decodePhoneLink(r *http.Request) (uuid.UUID, string, error) {

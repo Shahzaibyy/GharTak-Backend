@@ -69,8 +69,10 @@ WHERE lower(email) = $1 AND deleted_at IS NULL`
 const insertEmailSQL = `
 WITH inserted AS (
     INSERT INTO users (email, phone_verified)
-    VALUES ($1, false)
-    ON CONFLICT DO NOTHING
+    SELECT $1, false
+    WHERE NOT EXISTS (
+        SELECT 1 FROM users WHERE lower(email) = $1 AND deleted_at IS NULL
+    )
     RETURNING id, status
 )
 SELECT id, status FROM inserted

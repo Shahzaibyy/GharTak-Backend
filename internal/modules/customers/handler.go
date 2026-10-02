@@ -18,6 +18,7 @@ type addressAPI interface {
 	List(ctx context.Context, userID uuid.UUID) ([]Address, error)
 	Update(ctx context.Context, userID, addressID uuid.UUID, in AddressInput) (Address, error)
 	Delete(ctx context.Context, userID, addressID uuid.UUID) error
+	CompleteOnboarding(ctx context.Context, userID uuid.UUID, in OnboardingInput) (OnboardingResult, error)
 }
 
 type Handler struct {
@@ -34,6 +35,26 @@ type addressBody struct {
 	Lat         float64 `json:"lat"`
 	Lng         float64 `json:"lng"`
 	AddressText string  `json:"address_text"`
+}
+
+type onboardingBody struct {
+	Name    string      `json:"name"`
+	Address addressBody `json:"address"`
+}
+
+func (h *Handler) Onboarding(w http.ResponseWriter, r *http.Request) {
+	userID, in, err := decodeOnboarding(r)
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	result, err := h.addresses.CompleteOnboarding(r.Context(), userID, in)
+	if err != nil {
+		h.log.Error().Err(err).Msg("customer onboarding")
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteData(w, http.StatusOK, result)
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
@@ -139,6 +160,27 @@ func decodeAddress(r *http.Request) (AddressInput, error) {
 		return AddressInput{}, err
 	}
 	return AddressInput{Label: body.Label, Lat: body.Lat, Lng: body.Lng, AddressText: body.AddressText}, nil
+}
+
+func decodeOnboarding(r *http.Request) (uuid.UUID, OnboardingInput, error) {
+	userID, err := callerID(r)
+	if err != nil {
+		return uuid.UUID{}, OnboardingInput{}, err
+	}
+	var body onboardingBody
+	if err := httpx.Decode(r, &body); err != nil {
+		return uuid.UUID{}, OnboardingInput{}, err
+	}
+	if err := validAddress(body.Address); err != nil {
+		return uuid.UUID{}, OnboardingInput{}, err
+	}
+	return userID, OnboardingInput{
+		Name: body.Name,
+		Address: AddressInput{
+			Label: body.Address.Label, Lat: body.Address.Lat, Lng: body.Address.Lng,
+			AddressText: body.Address.AddressText,
+		},
+	}, nil
 }
 
 func validAddress(body addressBody) error {
