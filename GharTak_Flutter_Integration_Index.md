@@ -73,7 +73,11 @@ Rules that avoid showcase failures:
 |---|---|
 | Attock City zone | `11111111-1111-4111-8111-111111111101` |
 | Hasan Abdal zone | `11111111-1111-4111-8111-111111111102` |
-| Demo restaurant | `22222222-2222-4222-8222-222222222201` · phone `03000000001` |
+| Fateh Jang zone (active in demo) | `11111111-1111-4111-8111-111111111104` |
+| Demo restaurant (Attock) | `22222222-2222-4222-8222-222222222201` · phone `03000000001` |
+| Fateh Jang restaurants | phones `03003333001`–`03003333008` (see Demo Seed guide) |
+| Fateh Jang customers | phones `03001111001`–`03001111005` |
+| Fateh Jang riders (online) | phones `03002222001`–`03002222005` |
 | Demo admin | phone `03000000002` (UUID assigned at seed) |
 | Catalog item IDs | **Not fixed** — always `GET /merchants/{id}/catalog` |
 

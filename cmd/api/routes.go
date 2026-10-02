@@ -65,9 +65,6 @@ func buildModules(app *application) (modules, *background, error) {
 	adminRepo := admin.NewRepository(app.pool)
 	adminSvc := admin.NewService(adminRepo)
 	merchantSvc := merchants.NewService(merchants.NewRepository(app.pool), adminSvc, app.cfg.PIIKey, app.cfg.PhoneHashKey)
-	if err := maybeSeed(app, adminRepo, merchantSvc); err != nil {
-		return modules{}, nil, err
-	}
 	queueClient, err := queue.NewClient(app.cfg.QueueRedisURL())
 	if err != nil {
 		return modules{}, nil, err
@@ -111,6 +108,10 @@ func buildModules(app *application) (modules, *background, error) {
 	authSvc.UseRiderBootstrap(riderSvc)
 	customerSvc := customers.NewService(customers.NewRepository(app.pool))
 	customerSvc.UseProfiles(authSvc)
+	if err := maybeSeed(app, adminRepo, merchantSvc, riderSvc, authSvc); err != nil {
+		queueClient.Close()
+		return modules{}, nil, err
+	}
 	chatSvc := chat.NewService(chat.NewRepository(app.pool), orderSvc, app.redis, app.log)
 	supportSvc := support.NewService(support.NewRepository(app.pool))
 	placeSvc := geo.NewService(geocoder, func(ctx context.Context, id uuid.UUID) (float64, float64, error) {
@@ -154,14 +155,30 @@ func buildModules(app *application) (modules, *background, error) {
 	}, bg, nil
 }
 
-func maybeSeed(app *application, adminRepo *admin.Repository, merchantsSvc *merchants.Service) error {
+func maybeSeed(
+	app *application,
+	adminRepo *admin.Repository,
+	merchantsSvc *merchants.Service,
+	riderSvc *riders.Service,
+	authSvc *auth.Service,
+) error {
 	if app.cfg.AppEnv != "development" {
 		return nil
 	}
-	if err := merchantsSvc.SeedDemo(context.Background()); err != nil {
+	ctx := context.Background()
+	if err := merchantsSvc.SeedDemo(ctx); err != nil {
 		return err
 	}
-	return adminRepo.SeedDemoAdmin(context.Background(), app.cfg.PIIKey, app.cfg.PhoneHashKey)
+	if err := merchantsSvc.SeedFatehJang(ctx); err != nil {
+		return err
+	}
+	if err := adminRepo.SeedDemoAdmin(ctx, app.cfg.PIIKey, app.cfg.PhoneHashKey); err != nil {
+		return err
+	}
+	if err := authSvc.SeedFatehJangCustomers(ctx, app.pool); err != nil {
+		return err
+	}
+	return riderSvc.SeedFatehJang(ctx, app.pool)
 }
 
 func routes(m modules) http.Handler {
