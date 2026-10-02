@@ -2,6 +2,7 @@ package customers
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -35,7 +36,7 @@ func TestCompleteOnboardingRejectsBadLabel(t *testing.T) {
 		Name: "Ayesha",
 		Address: AddressInput{Label: "school", Lat: 33.7, Lng: 72.3, AddressText: "x"},
 	})
-	if err == nil || err.Error() != apperror.Invalid("label is invalid").Error() {
+	if !errors.Is(err, apperror.ErrInvalidInput) {
 		t.Fatalf("err = %v", err)
 	}
 }

@@ -1793,6 +1793,10 @@ components:
         phone_verified: {type: boolean}
         wallet_balance:
           $ref: "#/components/schemas/Money"
+        preferred_order_types:
+          type: array
+          items: {type: string, enum: [food, mart, courier]}
+          nullable: true
     ProfileResponse:
       type: object
       properties:

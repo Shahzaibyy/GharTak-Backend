@@ -15,9 +15,10 @@ Use these guides while the Flutter UI is already built and APIs are not wired ye
 | [`GharTak_Flutter_Demo_Seed_Guide.md`](./GharTak_Flutter_Demo_Seed_Guide.md) | Client demo / QA without SMS, Firebase, or Mapbox billing drama |
 | [`GharTak_Flutter_Mapbox_Guide.md`](./GharTak_Flutter_Mapbox_Guide.md) | Maps SDK on device + which calls must hit **this** backend |
 | [`GharTak_Flutter_API_Auth.md`](./GharTak_Flutter_API_Auth.md) | OTP, session, profile, phone link (no SMS provider needed in `development`) |
+| [`GharTak_Flutter_API_Onboarding.md`](./GharTak_Flutter_API_Onboarding.md) | Customer + rider HTML onboarding screens → endpoints |
 | [`GharTak_Flutter_API_Catalog_Orders.md`](./GharTak_Flutter_API_Catalog_Orders.md) | Zones → merchants → menu → quote → place → track |
 
-Integrate in that order: **demo seed → auth → catalog/orders → Mapbox/geo**. Do not wire Mapbox pricing on the phone.
+Integrate in that order: **demo seed → auth → onboarding → catalog/orders → Mapbox/geo**. Do not wire Mapbox pricing on the phone.
 
 ---
 

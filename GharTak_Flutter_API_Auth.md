@@ -27,8 +27,10 @@ features/auth/
 
 | Method | Path | Auth | Demo ready? |
 |---|---|---|---|
-| `POST` | `/auth/otp/request` | No | Yes — returns `dev_otp` when API `APP_ENV=development` |
+| `POST` | `/auth/otp/request` | No | Yes — optional `channel` `whatsapp`\|`sms`; returns `dev_otp` in development |
 | `POST` | `/auth/otp/verify` | No | Yes |
+| `POST` | `/auth/email/request` | No | Yes — passwordless email OTP (`dev_otp` in development) |
+| `POST` | `/auth/email/verify` | No | Yes — creates customer with `phone_verified=false` |
 | `POST` | `/auth/refresh` | No | Yes |
 | `POST` | `/auth/logout` | No | Yes |
 | `POST` | `/auth/google` | No | **No** until Firebase + backend credentials |
