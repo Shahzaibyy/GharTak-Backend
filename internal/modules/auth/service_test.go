@@ -126,7 +126,15 @@ func (f *fakeAccounts) FindByFirebase(context.Context, string) (Account, error) 
 	return Account{}, apperror.ErrNotFound
 }
 
+func (f *fakeAccounts) FindByEmail(context.Context, string) (Account, error) {
+	return Account{}, apperror.ErrNotFound
+}
+
 func (f *fakeAccounts) InsertGoogle(context.Context, googleInsert) (Account, error) {
+	return f.customer, nil
+}
+
+func (f *fakeAccounts) InsertEmail(context.Context, string) (Account, error) {
 	return f.customer, nil
 }
 
@@ -135,6 +143,10 @@ func (f *fakeAccounts) Profile(context.Context, uuid.UUID) (profileRow, error) {
 }
 
 func (f *fakeAccounts) UpdateName(context.Context, uuid.UUID, string) (profileRow, error) {
+	return profileRow{}, apperror.ErrNotFound
+}
+
+func (f *fakeAccounts) SetPreferences(context.Context, uuid.UUID, []string) (profileRow, error) {
 	return profileRow{}, apperror.ErrNotFound
 }
 

@@ -3,6 +3,7 @@ package riders
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -11,12 +12,19 @@ import (
 	"github.com/yourusername/ghartak-backend/internal/modules/auth"
 	"github.com/yourusername/ghartak-backend/internal/platform/apperror"
 	"github.com/yourusername/ghartak-backend/internal/platform/domain"
+	"github.com/yourusername/ghartak-backend/internal/platform/httpserver"
 	"github.com/yourusername/ghartak-backend/internal/platform/httpx"
 )
 
 type riderAPI interface {
 	Register(ctx context.Context, in RegisterInput) (Profile, error)
+	Apply(ctx context.Context, in ApplyInput) (auth.OTPResult, error)
 	Me(ctx context.Context, id uuid.UUID) (Profile, error)
+	Onboarding(ctx context.Context, id uuid.UUID) (OnboardingStatus, error)
+	SaveDetails(ctx context.Context, id uuid.UUID, in DetailsInput) (Profile, error)
+	SaveDocuments(ctx context.Context, id uuid.UUID, in DocumentsInput) (Profile, error)
+	Submit(ctx context.Context, id uuid.UUID) (Profile, error)
+	BookOrientation(ctx context.Context, id uuid.UUID, in OrientationInput) (Profile, error)
 	SetOnline(ctx context.Context, id uuid.UUID, online bool) (Profile, error)
 	Position(ctx context.Context, id uuid.UUID, lat, lng float64) error
 	List(ctx context.Context, status domain.VerificationStatus) ([]Profile, error)
@@ -45,6 +53,31 @@ type registerBody struct {
 	ZoneID           string `json:"zone_id"`
 }
 
+type applyBody struct {
+	Phone   string `json:"phone"`
+	ZoneID  string `json:"zone_id"`
+	Channel string `json:"channel"`
+}
+
+type detailsBody struct {
+	Name          string `json:"name"`
+	CNIC          string `json:"cnic"`
+	VehicleType   string `json:"vehicle_type"`
+	VehicleReg    string `json:"vehicle_reg"`
+	LicenseNumber string `json:"license_number"`
+}
+
+type documentsBody struct {
+	CNICFrontObjectKey string `json:"cnic_front_object_key"`
+	CNICBackObjectKey  string `json:"cnic_back_object_key"`
+	LicenseObjectKey   string `json:"license_object_key"`
+	SelfieObjectKey    string `json:"selfie_object_key"`
+}
+
+type orientationBody struct {
+	PreferredSlot string `json:"preferred_slot"`
+}
+
 type onlineBody struct {
 	IsOnline bool `json:"is_online"`
 }
@@ -68,6 +101,21 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteData(w, http.StatusCreated, profile)
 }
 
+func (h *Handler) Apply(w http.ResponseWriter, r *http.Request) {
+	in, err := decodeApply(r)
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	result, err := h.riders.Apply(r.Context(), in)
+	if err != nil {
+		h.log.Error().Err(err).Msg("rider apply")
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteData(w, http.StatusOK, result)
+}
+
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	id, err := callerID(r)
 	if err != nil {
@@ -77,6 +125,81 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	profile, err := h.riders.Me(r.Context(), id)
 	if err != nil {
 		h.log.Error().Err(err).Str("rider_id", id.String()).Msg("rider profile")
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteData(w, http.StatusOK, profile)
+}
+
+func (h *Handler) OnboardingStatus(w http.ResponseWriter, r *http.Request) {
+	id, err := callerID(r)
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	status, err := h.riders.Onboarding(r.Context(), id)
+	if err != nil {
+		h.log.Error().Err(err).Str("rider_id", id.String()).Msg("rider onboarding")
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteData(w, http.StatusOK, status)
+}
+
+func (h *Handler) Details(w http.ResponseWriter, r *http.Request) {
+	id, in, err := decodeDetails(r)
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	profile, err := h.riders.SaveDetails(r.Context(), id, in)
+	if err != nil {
+		h.log.Error().Err(err).Str("rider_id", id.String()).Msg("rider details")
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteData(w, http.StatusOK, profile)
+}
+
+func (h *Handler) Documents(w http.ResponseWriter, r *http.Request) {
+	id, in, err := decodeDocuments(r)
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	profile, err := h.riders.SaveDocuments(r.Context(), id, in)
+	if err != nil {
+		h.log.Error().Err(err).Str("rider_id", id.String()).Msg("rider documents")
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteData(w, http.StatusOK, profile)
+}
+
+func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
+	id, err := callerID(r)
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	profile, err := h.riders.Submit(r.Context(), id)
+	if err != nil {
+		h.log.Error().Err(err).Str("rider_id", id.String()).Msg("rider submit")
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteData(w, http.StatusOK, profile)
+}
+
+func (h *Handler) Orientation(w http.ResponseWriter, r *http.Request) {
+	id, in, err := decodeOrientation(r)
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	profile, err := h.riders.BookOrientation(r.Context(), id, in)
+	if err != nil {
+		h.log.Error().Err(err).Str("rider_id", id.String()).Msg("rider orientation")
 		httpx.WriteError(w, err)
 		return
 	}
@@ -178,6 +301,67 @@ func decodeRegister(r *http.Request) (RegisterInput, error) {
 		SelfieObjectKey: body.SelfieObjectKey, LicenseObjectKey: body.LicenseObjectKey,
 		VehicleReg: body.VehicleReg, ZoneID: zoneID,
 	}, nil
+}
+
+func decodeApply(r *http.Request) (ApplyInput, error) {
+	var body applyBody
+	if err := httpx.Decode(r, &body); err != nil {
+		return ApplyInput{}, err
+	}
+	zoneID, err := httpx.ParseUUID(body.ZoneID, "zone_id")
+	if err != nil {
+		return ApplyInput{}, err
+	}
+	return ApplyInput{
+		Phone: body.Phone, ZoneID: zoneID, Channel: body.Channel,
+		IP: httpserver.ClientIP(r.RemoteAddr),
+	}, nil
+}
+
+func decodeDetails(r *http.Request) (uuid.UUID, DetailsInput, error) {
+	id, err := callerID(r)
+	if err != nil {
+		return uuid.UUID{}, DetailsInput{}, err
+	}
+	var body detailsBody
+	if err := httpx.Decode(r, &body); err != nil {
+		return uuid.UUID{}, DetailsInput{}, err
+	}
+	return id, DetailsInput{
+		Name: strings.TrimSpace(body.Name), CNIC: body.CNIC,
+		VehicleType: domain.VehicleType(body.VehicleType),
+		VehicleReg: strings.TrimSpace(body.VehicleReg),
+		LicenseNumber: strings.TrimSpace(body.LicenseNumber),
+	}, nil
+}
+
+func decodeDocuments(r *http.Request) (uuid.UUID, DocumentsInput, error) {
+	id, err := callerID(r)
+	if err != nil {
+		return uuid.UUID{}, DocumentsInput{}, err
+	}
+	var body documentsBody
+	if err := httpx.Decode(r, &body); err != nil {
+		return uuid.UUID{}, DocumentsInput{}, err
+	}
+	return id, DocumentsInput{
+		CNICFrontObjectKey: body.CNICFrontObjectKey,
+		CNICBackObjectKey:  body.CNICBackObjectKey,
+		LicenseObjectKey:   body.LicenseObjectKey,
+		SelfieObjectKey:    body.SelfieObjectKey,
+	}, nil
+}
+
+func decodeOrientation(r *http.Request) (uuid.UUID, OrientationInput, error) {
+	id, err := callerID(r)
+	if err != nil {
+		return uuid.UUID{}, OrientationInput{}, err
+	}
+	var body orientationBody
+	if err := httpx.Decode(r, &body); err != nil {
+		return uuid.UUID{}, OrientationInput{}, err
+	}
+	return id, OrientationInput{PreferredSlot: body.PreferredSlot}, nil
 }
 
 func readRegister(r *http.Request) (registerBody, uuid.UUID, error) {

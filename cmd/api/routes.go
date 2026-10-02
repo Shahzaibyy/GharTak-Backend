@@ -27,6 +27,7 @@ import (
 	"github.com/yourusername/ghartak-backend/internal/platform/events"
 	"github.com/yourusername/ghartak-backend/internal/platform/httpserver"
 	"github.com/yourusername/ghartak-backend/internal/platform/mapbox"
+	"github.com/yourusername/ghartak-backend/internal/platform/notify"
 	"github.com/yourusername/ghartak-backend/internal/platform/queue"
 	"github.com/yourusername/ghartak-backend/internal/platform/uploads"
 )
@@ -84,6 +85,7 @@ func buildModules(app *application) (modules, *background, error) {
 		return modules{}, nil, err
 	}
 	authSvc.UseIdentity(identity)
+	authSvc.UseSender(notify.NewLogSender(app.log))
 	payRepo := payments.NewRepository(app.pool)
 	noteRepo := notifications.NewRepository(app.pool)
 	sender := notifications.NewSender(app.log, app.cfg.FCMServerKey, noteRepo)
@@ -104,6 +106,11 @@ func buildModules(app *application) (modules, *background, error) {
 	orderSvc := orders.NewService(adminSvc, merchantSvc, orderRepo).WithFlow(app.cfg.PhoneHashKey, notifier, dispSvc).UsePhoneGate(authSvc).UseRouter(router)
 	riderSvc := riders.NewService(riders.NewRepository(app.pool), adminSvc, app.cfg.PIIKey, app.cfg.PhoneHashKey)
 	riderSvc.UsePresence(riderGeo)
+	riderSvc.UseApply(riders.NewRedisApply(app.redis))
+	riderSvc.UseOTP(authSvc)
+	authSvc.UseRiderBootstrap(riderSvc)
+	customerSvc := customers.NewService(customers.NewRepository(app.pool))
+	customerSvc.UseProfiles(authSvc)
 	chatSvc := chat.NewService(chat.NewRepository(app.pool), orderSvc, app.redis, app.log)
 	supportSvc := support.NewService(support.NewRepository(app.pool))
 	placeSvc := geo.NewService(geocoder, func(ctx context.Context, id uuid.UUID) (float64, float64, error) {
@@ -130,7 +137,7 @@ func buildModules(app *application) (modules, *background, error) {
 		auth:      auth.NewHandler(authSvc, app.log),
 		zones:     admin.NewHandler(adminSvc, app.log),
 		merchants: merchants.NewHandler(merchantSvc, app.log),
-		customers: customers.NewHandler(customers.NewService(customers.NewRepository(app.pool)), app.log),
+		customers: customers.NewHandler(customerSvc, app.log),
 		orders:    orders.NewHandler(orderSvc, app.log),
 		riders:    riders.NewHandler(riderSvc, app.log),
 		payments:  payments.NewHandler(payments.NewService(payRepo), app.log),
@@ -181,6 +188,8 @@ func publicRoutes(r chi.Router, m modules) {
 	r.Get("/zones", m.zones.ListZones)
 	r.Post("/auth/otp/request", m.auth.RequestOTP)
 	r.Post("/auth/otp/verify", m.auth.Verify)
+	r.Post("/auth/email/request", m.auth.RequestEmail)
+	r.Post("/auth/email/verify", m.auth.VerifyEmail)
 	r.Post("/auth/refresh", m.auth.Refresh)
 	r.Post("/auth/google", m.auth.Google)
 	r.Post("/auth/logout", m.auth.Logout)
@@ -188,6 +197,7 @@ func publicRoutes(r chi.Router, m modules) {
 	r.Get("/merchants", m.merchants.List)
 	r.Get("/merchants/{id}/catalog", m.merchants.Catalog)
 	r.Post("/riders/register", m.riders.Register)
+	r.Post("/riders/onboarding/apply", m.riders.Apply)
 	r.Post("/payments/webhooks/{provider}", m.payments.Webhook)
 }
 
@@ -210,6 +220,8 @@ func customerRoutes(r chi.Router, m modules) {
 		r.Delete("/users/me", m.auth.DeleteMe)
 		r.Post("/auth/phone/link", m.auth.PhoneLink)
 		r.Post("/auth/phone/link/verify", m.auth.PhoneLinkVerify)
+		r.Post("/customers/onboarding", m.customers.Onboarding)
+		r.Patch("/customers/me/preferences", m.auth.Preferences)
 		r.Get("/addresses", m.customers.List)
 		r.Post("/addresses", m.customers.Create)
 		r.Patch("/addresses/{id}", m.customers.Update)
@@ -241,6 +253,11 @@ func riderRoutes(r chi.Router, m modules) {
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RequireRole(auth.RoleRider))
 		r.Get("/riders/me", m.riders.Me)
+		r.Get("/riders/me/onboarding", m.riders.OnboardingStatus)
+		r.Patch("/riders/me/onboarding/details", m.riders.Details)
+		r.Put("/riders/me/onboarding/documents", m.riders.Documents)
+		r.Post("/riders/me/onboarding/submit", m.riders.Submit)
+		r.Post("/riders/me/onboarding/orientation", m.riders.Orientation)
 		r.Post("/riders/availability", m.riders.Availability)
 		r.Post("/riders/position", m.riders.Position)
 		r.Get("/riders/offers", m.orders.Offers)

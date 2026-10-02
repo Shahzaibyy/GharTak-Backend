@@ -18,7 +18,7 @@ type store interface {
 }
 
 type profileWriter interface {
-	UpdateName(ctx context.Context, id uuid.UUID, name string) error
+	UpdateNameOnly(ctx context.Context, id uuid.UUID, name string) error
 }
 
 type Service struct {
@@ -77,7 +77,7 @@ func (s *Service) CompleteOnboarding(ctx context.Context, userID uuid.UUID, in O
 	if s.profiles == nil {
 		return OnboardingResult{}, apperror.ErrUnavailable
 	}
-	if err := s.profiles.UpdateName(ctx, userID, name); err != nil {
+	if err := s.profiles.UpdateNameOnly(ctx, userID, name); err != nil {
 		return OnboardingResult{}, err
 	}
 	address, err := s.store.Insert(ctx, userID, in.Address)

@@ -166,9 +166,18 @@ func (m *memAccounts) FindByFirebase(_ context.Context, uid string) (Account, er
 	return m.existing, nil
 }
 
+func (m *memAccounts) FindByEmail(context.Context, string) (Account, error) {
+	return Account{}, apperror.ErrNotFound
+}
+
 func (m *memAccounts) InsertGoogle(context.Context, googleInsert) (Account, error) {
 	m.inserted = true
 	return Account{ID: uuid.MustParse("55555555-5555-4555-8555-555555555509"), Status: "active"}, nil
+}
+
+func (m *memAccounts) InsertEmail(context.Context, string) (Account, error) {
+	m.inserted = true
+	return Account{ID: uuid.MustParse("55555555-5555-4555-8555-555555555508"), Status: "active"}, nil
 }
 
 func (m *memAccounts) Profile(context.Context, uuid.UUID) (profileRow, error) {
@@ -178,6 +187,15 @@ func (m *memAccounts) Profile(context.Context, uuid.UUID) (profileRow, error) {
 func (m *memAccounts) UpdateName(_ context.Context, id uuid.UUID, name string) (profileRow, error) {
 	m.profile.ID = id
 	m.profile.Name = &name
+	if m.profile.Wallet == "" {
+		m.profile.Wallet = "0.00"
+	}
+	return m.profile, nil
+}
+
+func (m *memAccounts) SetPreferences(_ context.Context, id uuid.UUID, types []string) (profileRow, error) {
+	m.profile.ID = id
+	m.profile.PreferredOrderTypes = types
 	if m.profile.Wallet == "" {
 		m.profile.Wallet = "0.00"
 	}

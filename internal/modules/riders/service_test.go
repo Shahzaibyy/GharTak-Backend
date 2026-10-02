@@ -103,6 +103,10 @@ func (f *fakeStore) Insert(_ context.Context, row sealedRider) (Profile, error) 
 	return f.profile, f.err
 }
 
+func (f *fakeStore) InsertShell(context.Context, string, string, uuid.UUID) (Profile, error) {
+	return f.profile, f.err
+}
+
 func (f *fakeStore) Get(context.Context, uuid.UUID) (Profile, error) {
 	return f.profile, f.err
 }
@@ -124,6 +128,22 @@ func (f *fakeStore) Reject(context.Context, uuid.UUID) (Profile, error) {
 }
 
 func (f *fakeStore) Suspend(context.Context, uuid.UUID) (Profile, error) {
+	return f.profile, f.err
+}
+
+func (f *fakeStore) UpdateDetails(context.Context, uuid.UUID, detailsRow) (Profile, error) {
+	return f.profile, f.err
+}
+
+func (f *fakeStore) UpdateDocuments(context.Context, uuid.UUID, DocumentsInput) (Profile, error) {
+	return f.profile, f.err
+}
+
+func (f *fakeStore) Submit(context.Context, uuid.UUID) (Profile, error) {
+	return f.profile, f.err
+}
+
+func (f *fakeStore) BookOrientation(context.Context, uuid.UUID, *string) (Profile, error) {
 	return f.profile, f.err
 }
 
