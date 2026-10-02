@@ -28,6 +28,7 @@ tags:
   - name: Chat
   - name: Support
   - name: Notifications
+  - name: Geo
 paths:
   /health:
     get:
@@ -169,6 +170,73 @@ paths:
       responses:
         "204":
           description: Refresh token revoked
+        "400":
+          $ref: "#/components/responses/Error"
+  /geo/search:
+    get:
+      tags: [Geo]
+      summary: Forward geocode (Pakistan)
+      description: Proxies Mapbox Geocoding v6 with country=pk. Temporary results only. Persist map pin + user text.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: {type: string, minLength: 3, maxLength: 100}
+        - name: near_lat
+          in: query
+          schema: {type: number}
+        - name: near_lng
+          in: query
+          schema: {type: number}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 5, default: 5}
+        - name: zone_id
+          in: query
+          schema: {type: string, format: uuid}
+      responses:
+        "200":
+          description: Matches
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/GeoPlace"
+        "400":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+  /geo/reverse:
+    get:
+      tags: [Geo]
+      summary: Reverse geocode
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema: {type: number}
+        - name: lng
+          in: query
+          required: true
+          schema: {type: number}
+      responses:
+        "200":
+          description: Place
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/GeoPlace"
         "400":
           $ref: "#/components/responses/Error"
   /auth/phone/link:
@@ -1371,6 +1439,10 @@ components:
           type: string
         service_radius_km:
           type: string
+        center_lat:
+          type: number
+        center_lng:
+          type: number
         is_active:
           type: boolean
         created_at:
@@ -1386,6 +1458,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Zone"
+    GeoPlace:
+      type: object
+      properties:
+        label: {type: string}
+        lat: {type: number}
+        lng: {type: number}
+        place: {type: string}
     OTPRequest:
       type: object
       required: [phone, role]
@@ -1717,6 +1796,8 @@ components:
       properties:
         distance_km:
           type: string
+        duration_min:
+          type: integer
         item_total:
           $ref: "#/components/schemas/Money"
         delivery_fee:
@@ -1729,6 +1810,14 @@ components:
           type: string
         total:
           $ref: "#/components/schemas/Money"
+        approximate:
+          type: boolean
+          description: True when distance came from haversine fallback instead of Mapbox Directions.
+        route:
+          type: object
+          nullable: true
+          description: Optional Mapbox LineString geometry for the priced path.
+          additionalProperties: true
     QuoteResponse:
       type: object
       properties:

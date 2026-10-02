@@ -58,6 +58,7 @@ type Service struct {
 	notifier statusNotifier
 	offers   offerer
 	phones   phoneGate
+	router   roadRouter
 }
 
 func NewService(zones zoneSource, catalog catalogSource, orders orderStore) *Service {
@@ -184,7 +185,7 @@ func (s *Service) dispatch(ctx context.Context, customerID uuid.UUID, in PlaceIn
 	if RequiresMerchant(in.Type) {
 		return s.buildCatalog(ctx, customerID, in, zone)
 	}
-	return quoteDraft(customerID, in, zone, nil, money.FromPaisa(0), nil, "0.00")
+	return s.quoteDraft(ctx, customerID, in, zone, nil, money.FromPaisa(0), nil, "0.00")
 }
 
 func (s *Service) buildCatalog(ctx context.Context, customerID uuid.UUID, in PlaceInput, zone admin.Zone) (draft, error) {
@@ -211,19 +212,7 @@ func (s *Service) priceCatalog(ctx context.Context, customerID uuid.UUID, in Pla
 	if err != nil {
 		return draft{}, err
 	}
-	return quoteDraft(customerID, in, zone, &pin, total, stored, pin.CommissionRate)
-}
-
-func quoteDraft(customerID uuid.UUID, in PlaceInput, zone admin.Zone, pin *merchants.Pin, itemTotal money.Money, items []OrderItem, commission string) (draft, error) {
-	lat, lng, address := pickupOf(in, pin)
-	priced, err := Price(cardOf(zone), distanceMeters(lat, lng, in.DropLat, in.DropLng), in.Effort, itemTotal, commission)
-	if err != nil {
-		return draft{}, priceErr(err)
-	}
-	return draft{
-		CustomerID: customerID, Input: in, PickupLat: lat, PickupLng: lng,
-		PickupAddress: address, Items: items, Price: priced,
-	}, nil
+	return s.quoteDraft(ctx, customerID, in, zone, &pin, total, stored, pin.CommissionRate)
 }
 
 func pickupOf(in PlaceInput, pin *merchants.Pin) (float64, float64, string) {

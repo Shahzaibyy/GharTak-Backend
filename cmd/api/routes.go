@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/yourusername/ghartak-backend/internal/modules/chat"
 	"github.com/yourusername/ghartak-backend/internal/modules/customers"
 	"github.com/yourusername/ghartak-backend/internal/modules/dispatch"
+	"github.com/yourusername/ghartak-backend/internal/modules/geo"
 	"github.com/yourusername/ghartak-backend/internal/modules/merchants"
 	"github.com/yourusername/ghartak-backend/internal/modules/notifications"
 	"github.com/yourusername/ghartak-backend/internal/modules/orders"
@@ -24,27 +26,29 @@ import (
 	"github.com/yourusername/ghartak-backend/internal/modules/support"
 	"github.com/yourusername/ghartak-backend/internal/platform/events"
 	"github.com/yourusername/ghartak-backend/internal/platform/httpserver"
+	"github.com/yourusername/ghartak-backend/internal/platform/mapbox"
 	"github.com/yourusername/ghartak-backend/internal/platform/queue"
 	"github.com/yourusername/ghartak-backend/internal/platform/uploads"
 )
 
 type modules struct {
-	log       zerolog.Logger
-	pool      *pgxpool.Pool
-	jwt       []byte
-	auth      *auth.Handler
-	zones     *admin.Handler
-	merchants *merchants.Handler
-	customers *customers.Handler
-	orders    *orders.Handler
-	riders    *riders.Handler
-	payments  *payments.Handler
-	support   *support.Handler
-	chat      *chat.Handler
-	notify    *notifications.Handler
-	realtime  *realtime.Handler
-	uploads       *uploads.Handler
-	queueMonitor  http.Handler
+	log          zerolog.Logger
+	pool         *pgxpool.Pool
+	jwt          []byte
+	auth         *auth.Handler
+	zones        *admin.Handler
+	merchants    *merchants.Handler
+	customers    *customers.Handler
+	orders       *orders.Handler
+	riders       *riders.Handler
+	payments     *payments.Handler
+	support      *support.Handler
+	chat         *chat.Handler
+	notify       *notifications.Handler
+	realtime     *realtime.Handler
+	uploads      *uploads.Handler
+	places       *geo.Handler
+	queueMonitor http.Handler
 }
 
 func (a *application) handler() (http.Handler, error) {
@@ -84,14 +88,33 @@ func buildModules(app *application) (modules, *background, error) {
 	noteRepo := notifications.NewRepository(app.pool)
 	sender := notifications.NewSender(app.log, app.cfg.FCMServerKey, noteRepo)
 	notifier := notifications.NewEventNotifier(bus)
-	geo := dispatch.NewGeo(app.redis)
-	dispSvc := dispatch.NewService(dispatch.NewRepository(app.pool), geo).UseOfferTimer(queue.NewOfferTimer(queueClient))
+	mapClient := mapbox.NewClient(mapbox.Settings{
+		Token: app.cfg.MapboxToken, BaseURL: app.cfg.MapboxBaseURL, Timeout: app.cfg.MapboxTimeout,
+	})
+	routeCache := mapbox.NewRedisCache(app.redis)
+	router := mapbox.NewFallbackRouter(
+		mapbox.NewCachedRouter(mapClient, routeCache, app.cfg.MapboxRouteCacheTTL),
+		app.cfg.RouteCircuityFactor,
+		app.cfg.RouteFallbackKMH,
+	)
+	geocoder := mapbox.NewCachedGeocoder(mapClient, routeCache, app.cfg.MapboxGeoSearchTTL, app.cfg.MapboxGeoReverseTTL)
+	riderGeo := dispatch.NewGeo(app.redis)
+	dispSvc := dispatch.NewService(dispatch.NewRepository(app.pool), riderGeo).UseOfferTimer(queue.NewOfferTimer(queueClient))
 	orderRepo := orders.NewRepository(app.pool).WithBooks(payRepo)
-	orderSvc := orders.NewService(adminSvc, merchantSvc, orderRepo).WithFlow(app.cfg.PhoneHashKey, notifier, dispSvc).UsePhoneGate(authSvc)
+	orderSvc := orders.NewService(adminSvc, merchantSvc, orderRepo).WithFlow(app.cfg.PhoneHashKey, notifier, dispSvc).UsePhoneGate(authSvc).UseRouter(router)
 	riderSvc := riders.NewService(riders.NewRepository(app.pool), adminSvc, app.cfg.PIIKey, app.cfg.PhoneHashKey)
-	riderSvc.UsePresence(geo)
+	riderSvc.UsePresence(riderGeo)
 	chatSvc := chat.NewService(chat.NewRepository(app.pool), orderSvc, app.redis, app.log)
 	supportSvc := support.NewService(support.NewRepository(app.pool))
+	placeSvc := geo.NewService(geocoder, func(ctx context.Context, id uuid.UUID) (float64, float64, error) {
+		zone, err := adminSvc.ActiveZone(ctx, id)
+		if err != nil {
+			return 0, 0, err
+		}
+		return zone.CenterLat, zone.CenterLng, nil
+	}, geo.NewRedisLimiter(app.redis))
+	realtimeHandler := realtime.NewHandler(app.cfg.JWTKey, app.redis, orderSvc, chatSvc, app.log)
+	realtimeHandler.UseETA(router)
 	monitor, err := queue.MonitorHandler(app.cfg.QueueRedisURL())
 	if err != nil {
 		queueClient.Close()
@@ -114,7 +137,8 @@ func buildModules(app *application) (modules, *background, error) {
 		support:   support.NewHandler(supportSvc, app.log),
 		chat:      chat.NewHandler(chatSvc, app.log),
 		notify:    notifications.NewHandler(sender, app.log),
-		realtime:  realtime.NewHandler(app.cfg.JWTKey, app.redis, orderSvc, chatSvc, app.log),
+		realtime:  realtimeHandler,
+		places:    geo.NewHandler(placeSvc, app.log),
 		uploads: uploads.NewHandler(uploads.NewSigner(uploads.Settings{
 			Endpoint: app.cfg.S3Endpoint, Bucket: app.cfg.S3Bucket, Region: app.cfg.S3Region,
 			AccessKey: app.cfg.S3AccessKey, SecretKey: app.cfg.S3SecretKey,
@@ -203,6 +227,8 @@ func customerRoutes(r chi.Router, m modules) {
 }
 
 func sharedRoutes(r chi.Router, m modules) {
+	r.Get("/geo/search", m.places.Search)
+	r.Get("/geo/reverse", m.places.Reverse)
 	r.Post("/uploads/presign", m.uploads.Presign)
 	r.Post("/notifications/devices", m.notify.Register)
 	r.Get("/orders/{id}/messages", m.chat.List)

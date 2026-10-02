@@ -34,6 +34,7 @@ type Handler struct {
 	parties parties
 	chat    chatSender
 	log     zerolog.Logger
+	eta     etaRouter
 }
 
 func NewHandler(key []byte, redis *redis.Client, parties parties, chat chatSender, log zerolog.Logger) *Handler {
@@ -88,6 +89,9 @@ func (h *Handler) serveLocation(w http.ResponseWriter, r *http.Request, session 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go h.readLocation(ctx, cancel, conn, session)
+	h.writeLastPosition(ctx, session.party.OrderID, func(ctx context.Context, raw []byte) error {
+		return conn.Write(ctx, websocket.MessageText, raw)
+	})
 	_ = forward(ctx, conn, h.redis, locationChannel(session.party.OrderID))
 }
 
@@ -115,7 +119,7 @@ func (h *Handler) readLocation(ctx context.Context, cancel context.CancelFunc, c
 		if err != nil {
 			return
 		}
-		h.publishLocation(ctx, session.party.OrderID, data)
+		h.publishLocation(ctx, session.party.OrderID, data, session)
 	}
 }
 
@@ -127,16 +131,6 @@ func (h *Handler) readChat(ctx context.Context, cancel context.CancelFunc, conn 
 			return
 		}
 		h.saveChat(ctx, session, data)
-	}
-}
-
-func (h *Handler) publishLocation(ctx context.Context, orderID uuid.UUID, data []byte) {
-	raw, ok := locationPayload(data)
-	if !ok {
-		return
-	}
-	if err := h.redis.Publish(ctx, locationChannel(orderID), raw).Err(); err != nil {
-		h.log.Error().Err(err).Str("order_id", orderID.String()).Msg("location publish")
 	}
 }
 
@@ -212,28 +206,8 @@ func discard(ctx context.Context, conn *websocket.Conn) {
 	}
 }
 
-type point struct {
-	Lat float64 `json:"lat"`
-	Lng float64 `json:"lng"`
-}
-
 type textBody struct {
 	Body string `json:"body"`
-}
-
-func locationPayload(data []byte) ([]byte, bool) {
-	var body point
-	if err := json.Unmarshal(data, &body); err != nil {
-		return nil, false
-	}
-	if !validCoord(body.Lat, body.Lng) {
-		return nil, false
-	}
-	raw, err := json.Marshal(body)
-	if err != nil {
-		return nil, false
-	}
-	return raw, true
 }
 
 func chatBody(data []byte) (string, bool) {
@@ -247,11 +221,3 @@ func chatBody(data []byte) (string, bool) {
 func locationChannel(orderID uuid.UUID) string {
 	return "order:" + orderID.String() + ":location"
 }
-
-func validCoord(lat, lng float64) bool {
-	return validLat(lat) && validLng(lng)
-}
-
-func validLat(lat float64) bool { return lat >= -90 && lat <= 90 }
-
-func validLng(lng float64) bool { return lng >= -180 && lng <= 180 }

@@ -1,6 +1,7 @@
 package orders
 
 import (
+	"encoding/json"
 	"math"
 
 	"github.com/yourusername/ghartak-backend/internal/modules/payments"
@@ -20,13 +21,16 @@ type Line struct {
 }
 
 type Priced struct {
-	DistanceKm      string      `json:"distance_km"`
-	ItemTotal       money.Money `json:"item_total"`
-	DeliveryFee     money.Money `json:"delivery_fee"`
-	Commission      money.Money `json:"commission_amount"`
-	RiderEarning    money.Money `json:"rider_earning"`
-	SurgeMultiplier string      `json:"surge_multiplier"`
-	Total           money.Money `json:"total"`
+	DistanceKm      string          `json:"distance_km"`
+	DurationMin     int             `json:"duration_min,omitempty"`
+	ItemTotal       money.Money     `json:"item_total"`
+	DeliveryFee     money.Money     `json:"delivery_fee"`
+	Commission      money.Money     `json:"commission_amount"`
+	RiderEarning    money.Money     `json:"rider_earning"`
+	SurgeMultiplier string          `json:"surge_multiplier"`
+	Total           money.Money     `json:"total"`
+	Approximate     bool            `json:"approximate"`
+	Route           json.RawMessage `json:"route,omitempty"`
 }
 
 func Price(card RateCard, meters int64, effort *EffortTier, itemTotal money.Money, commissionPercent string) (Priced, error) {
@@ -62,6 +66,13 @@ func distanceMeters(lat1, lng1, lat2, lng2 float64) int64 {
 	a := math.Sin(dLat/2)*math.Sin(dLat/2) + math.Cos(p1)*math.Cos(p2)*math.Sin(dLng/2)*math.Sin(dLng/2)
 	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
 	return int64(math.Round(earth * c))
+}
+
+func withRoute(priced Priced, durationS int, approximate bool, geometry json.RawMessage) Priced {
+	priced.DurationMin = (durationS + 30) / 60
+	priced.Approximate = approximate
+	priced.Route = geometry
+	return priced
 }
 
 func deliveryFee(card RateCard, meters int64) (money.Money, error) {

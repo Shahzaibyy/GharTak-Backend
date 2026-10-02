@@ -24,6 +24,8 @@ SELECT
     per_km_rate::text,
     surge_multiplier::text,
     service_radius_km::text,
+    center_lat,
+    center_lng,
     is_active,
     created_at,
     updated_at
@@ -46,6 +48,8 @@ SELECT
     per_km_rate::text,
     surge_multiplier::text,
     service_radius_km::text,
+    center_lat,
+    center_lng,
     is_active,
     created_at,
     updated_at
@@ -123,6 +127,8 @@ func scanZone(row rowScanner) (Zone, error) {
 		&perKm,
 		&zone.SurgeMultiplier,
 		&zone.ServiceRadiusKm,
+		&zone.CenterLat,
+		&zone.CenterLng,
 		&zone.IsActive,
 		&zone.CreatedAt,
 		&zone.UpdatedAt,

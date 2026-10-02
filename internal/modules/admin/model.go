@@ -16,6 +16,8 @@ type Zone struct {
 	PerKmRate       money.Money `json:"per_km_rate"`
 	SurgeMultiplier string      `json:"surge_multiplier"`
 	ServiceRadiusKm string      `json:"service_radius_km"`
+	CenterLat       float64     `json:"center_lat"`
+	CenterLng       float64     `json:"center_lng"`
 	IsActive        bool        `json:"is_active"`
 	CreatedAt       time.Time   `json:"created_at"`
 	UpdatedAt       time.Time   `json:"updated_at"`

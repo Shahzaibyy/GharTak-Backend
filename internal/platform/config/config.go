@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -32,6 +33,14 @@ type Config struct {
 	S3Region                string
 	S3AccessKey             string
 	S3SecretKey             string
+	MapboxToken             string
+	MapboxBaseURL           string
+	MapboxTimeout           time.Duration
+	MapboxRouteCacheTTL     time.Duration
+	MapboxGeoSearchTTL      time.Duration
+	MapboxGeoReverseTTL     time.Duration
+	RouteCircuityFactor     float64
+	RouteFallbackKMH        float64
 }
 
 func Load() (Config, error) {
@@ -81,6 +90,14 @@ func fromEnv() (Config, error) {
 		S3Region:                env("S3_REGION", "us-east-1"),
 		S3AccessKey:             os.Getenv("S3_ACCESS_KEY"),
 		S3SecretKey:             os.Getenv("S3_SECRET_KEY"),
+		MapboxToken:             mapboxToken(),
+		MapboxBaseURL:           env("MAPBOX_BASE_URL", "https://api.mapbox.com"),
+		MapboxTimeout:           envDuration("MAPBOX_TIMEOUT_MS", 3000*time.Millisecond),
+		MapboxRouteCacheTTL:     envDuration("MAPBOX_ROUTE_CACHE_TTL", 6*time.Hour),
+		MapboxGeoSearchTTL:      envDuration("MAPBOX_GEO_SEARCH_TTL", 24*time.Hour),
+		MapboxGeoReverseTTL:     envDuration("MAPBOX_GEO_REVERSE_TTL", 168*time.Hour),
+		RouteCircuityFactor:     envFloat("ROUTE_CIRCUITY_FACTOR", 1.3),
+		RouteFallbackKMH:        envFloat("ROUTE_FALLBACK_KMH", 20),
 	}, nil
 }
 
@@ -164,6 +181,40 @@ func envBool(name string, fallback bool) bool {
 		return fallback
 	}
 	return raw == "1" || raw == "true" || raw == "TRUE"
+}
+
+func envFloat(name string, fallback float64) float64 {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return fallback
+	}
+	return value
+}
+
+func envDuration(name string, fallback time.Duration) time.Duration {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return fallback
+	}
+	if ms, err := strconv.Atoi(raw); err == nil {
+		return time.Duration(ms) * time.Millisecond
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		return fallback
+	}
+	return d
+}
+
+func mapboxToken() string {
+	if value := os.Getenv("MAPBOX_BACKEND_TOKEN"); value != "" {
+		return value
+	}
+	return os.Getenv("GOOGLE_MAPBOX_API_KEY")
 }
 
 func env(name, fallback string) string {

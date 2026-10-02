@@ -43,6 +43,9 @@ These are already encoded in the schema, Go constants, or both. A later step tha
 | Offers | Rows in `order_offers`. The first `accepted` row wins. `rider_id` is set on the order at that transition. |
 | Cart | The client holds the cart until `POST /orders`. |
 | Photos and CNIC files | Store object keys (`photo_key`, `cnic_object_key`). Uploads go through presigned URLs. The API body limit stays 1 MB. |
+| Server-computed distance | Quote and place use Mapbox Directions (cached). Client never sends `distance_km`. On Mapbox failure, haversine × `ROUTE_CIRCUITY_FACTOR` with `approximate=true`. |
+| Geocoding storage | Temporary geocoding only. Persist map-pin lat/lng + user-edited address text (approach A). |
+| Zone geometry | `zones.center_lat` / `center_lng` + `service_radius_km` for camera lock and out-of-area checks. |
 | Orders | Cancel them. Leave the row in place. `order_events`, `ledger_entries`, `ratings`, and `blacklist` are append-only. |
 | Catalog delete | Allowed. `order_items` keeps `item_name` and `price_at_order`. |
 | Merchant hours | A later migration adds `weekly_hours`. |
@@ -136,12 +139,14 @@ Module: `internal/modules/orders`.
 
 ## Step 5 — Pricing
 
-Pure function in the orders module, table-driven, no database.
+Pure function in the orders module, table-driven, no database — plus Mapbox road distance.
 
-- Load the zone once, then compute delivery fee from `base_delivery_fee`, `per_km_rate`, distance, effort basis points, and `surge_multiplier`.
+- Load the zone once, then compute delivery fee from `base_delivery_fee`, `per_km_rate`, **server road distance**, effort basis points, and `surge_multiplier`.
+- `internal/platform/mapbox` Directions (cached 6h on cache Redis) with haversine fallback. Quote returns `duration_min`, `approximate`, and optional GeoJSON `route`.
+- Pickup and drop must fall inside the zone radius around `center_lat`/`center_lng`.
 - Add `money.MulBPS` here, with half-up rounding to the nearest paisa, and tests for 0.5 paisa boundaries.
 - Persist `distance_km`, `delivery_fee`, `commission_amount`, `rider_earning`, and `surge_multiplier` on the order inside the Step 4 transaction.
-- `GET` a quote endpoint if the client needs the fee before confirm. It is a read of the same function.
+- `POST /orders/quote` is the fee preview (same body shape as place, without requiring payment). `GET /geo/search` and `GET /geo/reverse` proxy Geocoding v6 with `country=pk`.
 
 ## Step 6 — Ledger
 
