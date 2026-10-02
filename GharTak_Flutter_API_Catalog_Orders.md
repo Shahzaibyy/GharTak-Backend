@@ -133,6 +133,24 @@ POST /orders/{id}/cancel
 
 (See OpenAPI for body / allowed statuses.)
 
+### Rider task flow (after dispatch offer)
+
+| Step | Method | Path | Body |
+|---|---|---|---|
+| List offers | `GET` | `/riders/offers` | — |
+| Accept | `POST` | `/riders/tasks/{id}/accept` | none |
+| Reject | `POST` | `/riders/tasks/{id}/reject` | none |
+| Pickup | `POST` | `/riders/tasks/{id}/pickup` | none |
+| En route | `POST` | `/riders/tasks/{id}/enroute` | none |
+| Deliver (food/mart) | `POST` | `/riders/tasks/{id}/deliver` | `{"delivery_otp":"1234"}` (4 digits from customer order) |
+| Deliver (courier/errand) | `POST` | `/riders/tasks/{id}/deliver` | `{"proof_photo_key":"..."}` |
+
+Aliases accepted for deliver: `otp` → `delivery_otp`, `proof` → `proof_photo_key`. Empty body → **400** with a clear message (not a silent accept).
+
+Rider profile is **`GET /riders/me`**, not `GET /users/me` (that is customer-only → 403).
+
+`delivery_otp` is returned to the **customer** on place (`data.delivery_otp`). Rider enters what the customer reads at the door.
+
 ---
 
 ## 4. Recommended Flutter checkout flow

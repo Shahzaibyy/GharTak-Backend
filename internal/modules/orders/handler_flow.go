@@ -1,7 +1,12 @@
 package orders
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -163,11 +168,6 @@ type cancelBody struct {
 	Reason string `json:"reason"`
 }
 
-type deliverPayload struct {
-	OTP   string `json:"delivery_otp"`
-	Proof string `json:"proof_photo_key"`
-}
-
 func cancelReason(r *http.Request) (string, error) {
 	var body cancelBody
 	if err := httpx.Decode(r, &body); err != nil {
@@ -177,11 +177,53 @@ func cancelReason(r *http.Request) (string, error) {
 }
 
 func deliverBody(r *http.Request) (string, string, error) {
-	var body deliverPayload
-	if err := httpx.Decode(r, &body); err != nil {
+	raw, err := readBody(r, 1<<20)
+	if err != nil {
 		return "", "", err
 	}
-	return body.OTP, body.Proof, nil
+	if len(raw) == 0 {
+		return "", "", apperror.Invalid("body required: {\"delivery_otp\":\"1234\"} for food/mart, or {\"proof_photo_key\":\"...\"} for courier/errand")
+	}
+	var fields map[string]any
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return "", "", apperror.Invalid("request body must be JSON")
+	}
+	otp := firstString(fields, "delivery_otp", "otp")
+	proof := firstString(fields, "proof_photo_key", "proof")
+	if otp == "" && proof == "" {
+		return "", "", apperror.Invalid("delivery_otp (food/mart) or proof_photo_key (courier/errand) is required")
+	}
+	return otp, proof, nil
+}
+
+func readBody(r *http.Request, limit int64) ([]byte, error) {
+	defer r.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(r.Body, limit+1))
+	if err != nil {
+		return nil, apperror.Invalid("request body is invalid")
+	}
+	if int64(len(raw)) > limit {
+		return nil, apperror.Invalid("request body is too large")
+	}
+	return bytes.TrimSpace(raw), nil
+}
+
+func firstString(fields map[string]any, keys ...string) string {
+	for _, key := range keys {
+		value, ok := fields[key]
+		if !ok || value == nil {
+			continue
+		}
+		switch typed := value.(type) {
+		case string:
+			return strings.TrimSpace(typed)
+		case float64:
+			return strings.TrimSpace(strconv.FormatInt(int64(typed), 10))
+		case json.Number:
+			return strings.TrimSpace(typed.String())
+		}
+	}
+	return ""
 }
 
 func parseStatus(raw string, fallback Status) (Status, error) {
