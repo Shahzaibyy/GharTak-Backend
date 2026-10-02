@@ -122,6 +122,8 @@ func (s *Service) afterStatus(ctx context.Context, order Order, offer bool) (Ord
 }
 
 func (s *Service) reload(ctx context.Context, order Order) (Order, error) {
+	// Auto-dispatch on ready: soft-fail so merchant advance still succeeds
+	// (manual POST /orders/{id}/dispatch returns a clear error if no riders).
 	if err := s.offer(ctx, order.ID); err != nil {
 		return order, nil
 	}

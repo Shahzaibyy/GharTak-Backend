@@ -39,6 +39,10 @@ func ConflictCode(code, message string) error {
 	return &Error{sentinel: ErrConflict, message: message, code: code}
 }
 
+func Unavailable(message string) error {
+	return &Error{sentinel: ErrUnavailable, message: message}
+}
+
 func (e *Error) Error() string { return e.message }
 
 func (e *Error) Unwrap() error { return e.sentinel }

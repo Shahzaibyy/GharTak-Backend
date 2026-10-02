@@ -2,11 +2,14 @@ package dispatch
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
+
+const presenceTTL = 2 * time.Minute
 
 type Geo struct {
 	client *redis.Client
@@ -33,7 +36,7 @@ func (g *Geo) Upsert(ctx context.Context, zoneID, riderID uuid.UUID, lng, lat fl
 	if err := g.client.Expire(ctx, key, 24*time.Hour).Err(); err != nil {
 		return err
 	}
-	return g.client.Set(ctx, riderKey(riderID), zoneID.String(), 45*time.Second).Err()
+	return g.client.Set(ctx, riderKey(riderID), zoneID.String(), presenceTTL).Err()
 }
 
 func (g *Geo) Remove(ctx context.Context, zoneID, riderID uuid.UUID) error {
@@ -44,15 +47,28 @@ func (g *Geo) Remove(ctx context.Context, zoneID, riderID uuid.UUID) error {
 }
 
 func (g *Geo) Nearest(ctx context.Context, zoneID uuid.UUID, lng, lat float64, km int, skip map[uuid.UUID]struct{}) (uuid.UUID, error) {
-	locs, err := g.client.GeoSearchLocation(ctx, zoneKey(zoneID), &redis.GeoSearchLocationQuery{
-		GeoSearchQuery: redis.GeoSearchQuery{
-			Longitude: lng, Latitude: lat, Radius: float64(km), RadiusUnit: "km", Sort: "ASC", Count: 10,
-		},
-	}).Result()
+	locs, err := g.search(ctx, zoneID, lng, lat, km)
 	if err != nil {
 		return uuid.Nil, err
 	}
 	return g.firstLive(ctx, locs, skip)
+}
+
+// search prefers GEOSEARCH (Redis 6.2+) and falls back to GEORADIUS for older Redis
+// (common on free-tier hosts where GEOADD works but GEOSEARCH returns unknown command).
+func (g *Geo) search(ctx context.Context, zoneID uuid.UUID, lng, lat float64, km int) ([]redis.GeoLocation, error) {
+	key := zoneKey(zoneID)
+	locs, err := g.client.GeoSearchLocation(ctx, key, &redis.GeoSearchLocationQuery{
+		GeoSearchQuery: redis.GeoSearchQuery{
+			Longitude: lng, Latitude: lat, Radius: float64(km), RadiusUnit: "km", Sort: "ASC", Count: 10,
+		},
+	}).Result()
+	if err == nil || errors.Is(err, redis.Nil) {
+		return locs, nil
+	}
+	return g.client.GeoRadius(ctx, key, lng, lat, &redis.GeoRadiusQuery{
+		Radius: float64(km), Unit: "km", Sort: "ASC", Count: 10,
+	}).Result()
 }
 
 func (g *Geo) firstLive(ctx context.Context, locs []redis.GeoLocation, skip map[uuid.UUID]struct{}) (uuid.UUID, error) {

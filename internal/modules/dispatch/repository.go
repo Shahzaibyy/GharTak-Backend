@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,7 +16,6 @@ import (
 	"github.com/yourusername/ghartak-backend/internal/modules/orders"
 	"github.com/yourusername/ghartak-backend/internal/platform/apperror"
 	"github.com/yourusername/ghartak-backend/internal/platform/database"
-	"github.com/yourusername/ghartak-backend/internal/platform/money"
 )
 
 type View struct {
@@ -158,12 +159,42 @@ func scanIDs(rows pgx.Rows) (map[uuid.UUID]struct{}, error) {
 	return out, nil
 }
 
-func radiusKm(raw string) (int, error) {
-	amount, err := money.Parse(raw)
+// OnlineInZone returns any approved online rider in the zone, skipping prior offers.
+// Used when Redis geo has no live hit (presence TTL expired or GEOSEARCH unavailable).
+func (r *Repository) OnlineInZone(ctx context.Context, zoneID uuid.UUID, skip map[uuid.UUID]struct{}) (uuid.UUID, error) {
+	ctx, cancel := database.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	rows, err := r.pool.Query(ctx, `
+SELECT id FROM riders
+WHERE zone_id = $1 AND is_online = true AND verification_status = 'approved'
+ORDER BY updated_at DESC
+LIMIT 20`, zoneID)
 	if err != nil {
-		return 0, fmt.Errorf("dispatch: radius: %w", err)
+		return uuid.Nil, fmt.Errorf("dispatch: online riders: %w", err)
 	}
-	return int((amount.Paisa() + 50) / 100), nil
+	defer rows.Close()
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return uuid.Nil, fmt.Errorf("dispatch: online riders: %w", err)
+		}
+		if skipped(skip, id) {
+			continue
+		}
+		return id, nil
+	}
+	if err := rows.Err(); err != nil {
+		return uuid.Nil, fmt.Errorf("dispatch: online riders: %w", err)
+	}
+	return uuid.Nil, nil
+}
+
+func radiusKm(raw string) (int, error) {
+	km, err := strconv.ParseFloat(raw, 64)
+	if err != nil || math.IsNaN(km) || km <= 0 {
+		return 0, fmt.Errorf("dispatch: radius: invalid service_radius_km %q", raw)
+	}
+	return int(math.Round(km)), nil
 }
 
 func isUnique(err error) bool {
